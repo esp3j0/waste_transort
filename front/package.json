@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@tarojs/cli": "^4.1.1"
+  }
+}

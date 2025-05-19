@@ -1,0 +1,1 @@
+{"version":3,"file":"create.js","sourceRoot":"","sources":["../../../src/presets/hooks/create.ts"],"names":[],"mappings":";;AAAA,qCAAoC;AAIpC,kBAAe,CAAC,GAAmB,EAAE,EAAE;IACrC;QACE,KAAK,CAAC,sBAAsB;KAC7B,CAAC,OAAO,CAAC,UAAU,CAAC,EAAE;QACrB,GAAG,CAAC,cAAc,CAAC,UAAU,CAAC,CAAA;IAChC,CAAC,CAAC,CAAA;AACJ,CAAC,CAAA"}

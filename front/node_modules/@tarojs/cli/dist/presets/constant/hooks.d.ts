@@ -1,0 +1,13 @@
+export declare const MODIFY_APP_CONFIG = "modifyAppConfig";
+export declare const MODIFY_WEBPACK_CHAIN = "modifyWebpackChain";
+export declare const MODIFY_VITE_CONFIG = "modifyViteConfig";
+export declare const MODIFY_BUILD_ASSETS = "modifyBuildAssets";
+export declare const MODIFY_MINI_CONFIGS = "modifyMiniConfigs";
+export declare const MODIFY_COMPONENT_CONFIG = "modifyComponentConfig";
+export declare const MODIFY_RUNNER_OPTS = "modifyRunnerOpts";
+export declare const ON_COMPILER_MAKE = "onCompilerMake";
+export declare const ON_PARSE_CREATE_ELEMENT = "onParseCreateElement";
+export declare const ON_BUILD_START = "onBuildStart";
+export declare const ON_BUILD_FINISH = "onBuildFinish";
+export declare const ON_BUILD_COMPLETE = "onBuildComplete";
+export declare const MODIFY_CREATE_TEMPLATE = "modifyCreateTemplate";

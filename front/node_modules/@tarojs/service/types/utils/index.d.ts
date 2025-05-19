@@ -1,0 +1,10 @@
+import { PluginType } from './constants';
+import type { IProjectConfig, PluginItem } from '@tarojs/taro/types/compile';
+import type { IPlugin, IPluginsObject } from './types';
+export declare const isNpmPkg: (name: string) => boolean;
+export declare function getPluginPath(pluginPath: string): string;
+export declare function convertPluginsToObject(items: PluginItem[]): () => IPluginsObject;
+export declare function mergePlugins(dist: PluginItem[], src: PluginItem[]): () => IPluginsObject;
+export declare function resolvePresetsOrPlugins(root: string, args: IPluginsObject, type: PluginType, skipError?: boolean): IPlugin[];
+export declare function printHelpLog(command: any, optionsList: Map<string, string>, synopsisList?: Set<string>): void;
+export declare function filterGlobalConfig(globalConfig: IProjectConfig, command: string): IProjectConfig<"webpack5">;
