@@ -28,4 +28,4 @@ git commit -m "xxx"
 git push origin xxx_dev
 ```
 3. 打开github 提交PR
-4. 合并PR
+4. 合并PR，
