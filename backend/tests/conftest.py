@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db.base import Base
 from app.db.session import get_db
-from app.main import app
+from main import app
 
 # 使用SQLite内存数据库进行测试
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
