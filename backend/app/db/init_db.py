@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # 确保所有模型都被导入
-from app.models import user, property  # noqa
+from app.models import user, property, order, transport, recycling  # noqa
 
 def init_db(db: Session) -> None:
     """初始化数据库"""
