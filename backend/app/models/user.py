@@ -1,9 +1,11 @@
-from sqlalchemy import Boolean, Column, Integer, String, Enum
+from sqlalchemy import Boolean, Column, Integer, String, Enum as SQLAlchemyEnum
 from sqlalchemy.orm import relationship
+from enum import StrEnum  # Python 3.11+ 新特性
 
 from app.db.base_class import Base
 
-class UserRole(str, Enum):
+# 使用更规范的 StrEnum 定义枚举（Python 3.11+）
+class UserRole(StrEnum):
     """用户角色枚举"""
     CUSTOMER = "customer"  # 用户下单端用户
     PROPERTY = "property"  # 物业管理端用户
@@ -14,16 +16,23 @@ class UserRole(str, Enum):
 class User(Base):
     """用户模型"""
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
-    email = Column(String, unique=True, index=True, nullable=True)
-    phone = Column(String, unique=True, index=True)
-    hashed_password = Column(String, nullable=False)
-    full_name = Column(String, index=True)
-    role = Column(String, default=UserRole.CUSTOMER)
+    username = Column(String(50), unique=True, index=True)  # 更推荐限定长度（如 String(50)）
+    email = Column(String(255), unique=True, index=True, nullable=True)  # 邮箱建议 255 长度
+    phone = Column(String(20), unique=True, index=True)  # 手机号适配国际号码长度
+    hashed_password = Column(String(128), nullable=False)  # 哈希密码通常固定长度（如 SHA-256 为 64 字符）
+    full_name = Column(String(50), index=True)
+    
+    # 关键修改：使用 SQLAlchemy 的 Enum 类型并直接绑定 UserRole 枚举类
+    role = Column(
+        SQLAlchemyEnum(UserRole),
+        default=UserRole.CUSTOMER,  # 直接使用枚举成员，不需要 .value
+        nullable=False
+    )
+    
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
-    wx_openid = Column(String, unique=True, index=True, nullable=True)
-    
+    wx_openid = Column(String(64), unique=True, index=True, nullable=True)  # 微信 OpenID 通常 64 字符
+
     # 关系
     orders = relationship("Order", back_populates="customer", foreign_keys="Order.customer_id")
     property_orders = relationship("Order", back_populates="property_manager", foreign_keys="Order.property_manager_id")
