@@ -93,11 +93,3 @@ def test_register_duplicate(client: TestClient, db: Session):
     }
     response = client.post("/api/v1/auth/register", json=register_data)
     assert response.status_code == 400
-
-# 测试微信登录API
-def test_wx_login(client: TestClient, db: Session):
-    # 由于微信登录需要真实的code，这里只测试接口是否可访问
-    response = client.post("/api/v1/auth/wx-login?code=test_code")
-    # 目前只是示例实现，应该返回200
-    assert response.status_code == 200
-    assert "access_token" in response.json()

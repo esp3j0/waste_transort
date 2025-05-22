@@ -8,7 +8,7 @@ from app.db.session import get_db
 from main import app
 
 # 使用SQLite内存数据库进行测试
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./waste_transport.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

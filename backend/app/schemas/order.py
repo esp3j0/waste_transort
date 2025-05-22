@@ -2,6 +2,7 @@ from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel
 from enum import Enum
+from .address import AddressResponse
 
 # 订单状态枚举
 class OrderStatus(str, Enum):
@@ -16,13 +17,8 @@ class OrderStatus(str, Enum):
 
 # 共享属性
 class OrderBase(BaseModel):
-    # 客户信息
-    customer_address: str
-    community_name: str
-    building_number: str
-    room_number: str
-    contact_name: str
-    contact_phone: str
+    # 地址信息
+    address_id: int
     
     # 订单信息
     waste_type: str
@@ -132,6 +128,9 @@ class OrderResponse(OrderBase):
     price: float
     payment_status: str
     payment_time: Optional[datetime] = None
+    
+    # 关系字段
+    address: Optional[AddressResponse] = None  # 添加地址关系
     
     class Config:
         orm_mode = True
