@@ -17,7 +17,7 @@
             "args": [
                 "${file}",
                 "-v",
-                "--tb=long"
+                "--tb=auto"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
@@ -33,7 +33,7 @@
             "args": [
                 "backend/tests",
                 "-v",
-                "--tb=long"
+                "--tb=auto"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
@@ -49,7 +49,7 @@
             "args": [
                 "backend/tests/test_crud.py::test_create_user",
                 "-v",
-                "--tb=long"
+                "--tb=auto"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
