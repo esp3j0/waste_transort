@@ -28,6 +28,8 @@ class UserCreate(UserBase):
 
 # 更新用户时可以更新的属性
 class UserUpdate(UserBase):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
     password: Optional[str] = None
 
 # API响应中的用户信息

@@ -2,7 +2,6 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from main import app
 from app.crud import user, order, property, transport, recycling
 from app.schemas.user import UserCreate
 from app.schemas.order import OrderCreate, OrderStatusUpdate
@@ -14,8 +13,6 @@ from app.models.order import OrderStatus
 from app.models.transport import DriverStatus
 from app.models.recycling import RecyclingStatus
 from app.core.security import create_access_token
-
-client = TestClient(app)
 
 # 辅助函数：创建不同角色的测试用户并返回token
 def create_user_with_role(db: Session, role, is_superuser=False):
@@ -36,7 +33,7 @@ def create_user_with_role(db: Session, role, is_superuser=False):
 # ============ 订单API测试 ============
 
 # 测试创建订单
-def test_create_order(db: Session):
+def test_create_order(client: TestClient, db: Session):
     # 创建客户用户
     customer, token = create_user_with_role(db, UserRole.CUSTOMER)
     
@@ -59,7 +56,7 @@ def test_create_order(db: Session):
     assert order_data["status"] == OrderStatus.PENDING
 
 # 测试非客户用户创建订单（应该被禁止）
-def test_create_order_forbidden(db: Session):
+def test_create_order_forbidden(client: TestClient, db: Session):
     # 创建物业用户
     property_user, token = create_user_with_role(db, UserRole.PROPERTY)
     
@@ -79,7 +76,7 @@ def test_create_order_forbidden(db: Session):
     assert response.status_code == 403
 
 # 测试获取订单列表
-def test_read_orders(db: Session):
+def test_read_orders(client: TestClient, db: Session):
     # 创建客户用户和订单
     customer, token = create_user_with_role(db, UserRole.CUSTOMER)
     order_in = OrderCreate(
@@ -103,7 +100,7 @@ def test_read_orders(db: Session):
     assert len(orders_data) > 0
 
 # 测试获取特定订单
-def test_read_order(db: Session):
+def test_read_order(client: TestClient, db: Session):
     # 创建客户用户和订单
     customer, token = create_user_with_role(db, UserRole.CUSTOMER)
     order_in = OrderCreate(
@@ -127,7 +124,7 @@ def test_read_order(db: Session):
     assert order_data["community_name"] == "测试小区"
 
 # 测试更新订单状态
-def test_update_order_status(db: Session):
+def test_update_order_status(client: TestClient, db: Session):
     # 创建客户用户和订单
     customer, customer_token = create_user_with_role(db, UserRole.CUSTOMER)
     order_in = OrderCreate(
@@ -158,7 +155,7 @@ def test_update_order_status(db: Session):
 # ============ 物业API测试 ============
 
 # 测试创建物业信息
-def test_create_property(db: Session):
+def test_create_property(client: TestClient, db: Session):
     # 创建物业用户
     property_user, token = create_user_with_role(db, UserRole.PROPERTY)
     
@@ -178,7 +175,7 @@ def test_create_property(db: Session):
     assert property_data["community_name"] == "测试小区"
 
 # 测试获取物业列表
-def test_read_properties(db: Session):
+def test_read_properties(client: TestClient, db: Session):
     # 创建物业用户和物业信息
     property_user, token = create_user_with_role(db, UserRole.PROPERTY)
     property_in = PropertyCreate(
@@ -199,7 +196,7 @@ def test_read_properties(db: Session):
     assert len(properties_data) > 0
 
 # 测试获取特定物业信息
-def test_read_property(db: Session):
+def test_read_property(client: TestClient, db: Session):
     # 创建物业用户和物业信息
     property_user, token = create_user_with_role(db, UserRole.PROPERTY)
     property_in = PropertyCreate(
@@ -222,7 +219,7 @@ def test_read_property(db: Session):
 # ============ 运输API测试 ============
 
 # 测试创建运输信息
-def test_create_transport(db: Session):
+def test_create_transport(client: TestClient, db: Session):
     # 创建运输用户
     transport_user, token = create_user_with_role(db, UserRole.TRANSPORT)
     
@@ -243,7 +240,7 @@ def test_create_transport(db: Session):
     assert transport_data["vehicle_plate"] == "京A12345"
 
 # 测试获取运输列表
-def test_read_transports(db: Session):
+def test_read_transports(client: TestClient, db: Session):
     # 创建运输用户和运输信息
     transport_user, token = create_user_with_role(db, UserRole.TRANSPORT)
     transport_in = TransportCreate(
@@ -265,7 +262,7 @@ def test_read_transports(db: Session):
     assert len(transports_data) > 0
 
 # 测试更新司机状态
-def test_update_driver_status(db: Session):
+def test_update_driver_status(client: TestClient, db: Session):
     # 创建运输用户和运输信息
     transport_user, token = create_user_with_role(db, UserRole.TRANSPORT)
     transport_in = TransportCreate(
@@ -277,10 +274,12 @@ def test_update_driver_status(db: Session):
         vehicle_volume=20.0
     )
     db_transport = transport.create_with_manager(db, obj_in=transport_in, manager_id=transport_user.id)
-    
+    status_update = {
+        "status": DriverStatus.BUSY
+    }
     # 测试更新司机状态
     headers = {"Authorization": f"Bearer {token}"}
-    response = client.put(f"/api/v1/transports/{db_transport.id}/status?status={DriverStatus.BUSY}", headers=headers)
+    response = client.put(f"/api/v1/transports/{db_transport.id}/status", json=status_update, headers=headers)
     assert response.status_code == 200
     transport_data = response.json()
     assert transport_data["driver_status"] == DriverStatus.BUSY
@@ -288,7 +287,7 @@ def test_update_driver_status(db: Session):
 # ============ 回收站API测试 ============
 
 # 测试创建回收站信息
-def test_create_recycling(db: Session):
+def test_create_recycling(client: TestClient, db: Session):
     # 创建回收站用户
     recycling_user, token = create_user_with_role(db, UserRole.RECYCLING)
     
@@ -308,7 +307,7 @@ def test_create_recycling(db: Session):
     assert recycling_data["capacity"] == 100.0
 
 # 测试获取回收站列表
-def test_read_recyclings(db: Session):
+def test_read_recyclings(client: TestClient, db: Session):
     # 创建回收站用户和回收站信息
     recycling_user, token = create_user_with_role(db, UserRole.RECYCLING)
     recycling_in = RecyclingCreate(
@@ -329,7 +328,7 @@ def test_read_recyclings(db: Session):
     assert len(recyclings_data) > 0
 
 # 测试更新回收站状态
-def test_update_recycling_status(db: Session):
+def test_update_recycling_status(client: TestClient, db: Session):
     # 创建回收站用户和回收站信息
     recycling_user, token = create_user_with_role(db, UserRole.RECYCLING)
     recycling_in = RecyclingCreate(
@@ -343,7 +342,10 @@ def test_update_recycling_status(db: Session):
     
     # 测试更新回收站状态
     headers = {"Authorization": f"Bearer {token}"}
-    response = client.put(f"/api/v1/recyclings/{db_recycling.id}/status?status={RecyclingStatus.MAINTENANCE}", headers=headers)
+    status_update = {
+        "status": RecyclingStatus.MAINTENANCE
+    }
+    response = client.put(f"/api/v1/recyclings/{db_recycling.id}/status", json=status_update, headers=headers)
     assert response.status_code == 200
     recycling_data = response.json()
     assert recycling_data["status"] == RecyclingStatus.MAINTENANCE

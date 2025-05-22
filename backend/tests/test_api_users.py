@@ -2,13 +2,10 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from main import app
 from app.crud.crud_user import user
 from app.schemas.user import UserCreate, UserUpdate
 from app.models.user import UserRole
 from app.core.security import create_access_token
-
-client = TestClient(app=app)
 
 # 辅助函数：创建测试用户并返回token
 def create_test_user_and_token(db: Session, is_superuser=False):
@@ -26,7 +23,7 @@ def create_test_user_and_token(db: Session, is_superuser=False):
     return db_user, access_token
 
 # 测试获取当前用户信息
-def test_read_user_me(db: Session):
+def test_read_user_me(client: TestClient, db: Session):
     # 创建测试用户和token
     db_user, access_token = create_test_user_and_token(db)
     
@@ -39,7 +36,7 @@ def test_read_user_me(db: Session):
     assert user_data["email"] == "testuser@example.com"
 
 # 测试更新当前用户信息
-def test_update_user_me(db: Session):
+def test_update_user_me(client: TestClient, db: Session):
     # 创建测试用户和token
     db_user, access_token = create_test_user_and_token(db)
     
@@ -56,7 +53,7 @@ def test_update_user_me(db: Session):
     assert user_data["email"] == "updated@example.com"
 
 # 测试普通用户无法修改自己的角色
-def test_update_user_me_role_forbidden(db: Session):
+def test_update_user_me_role_forbidden(client: TestClient, db: Session):
     # 创建测试用户和token
     db_user, access_token = create_test_user_and_token(db)
     
@@ -69,7 +66,7 @@ def test_update_user_me_role_forbidden(db: Session):
     assert response.status_code == 400
 
 # 测试管理员获取所有用户列表
-def test_read_users(db: Session):
+def test_read_users(client: TestClient, db: Session):
     # 创建管理员用户和token
     db_user, access_token = create_test_user_and_token(db, is_superuser=True)
     
@@ -81,7 +78,7 @@ def test_read_users(db: Session):
     assert isinstance(users_data, list)
 
 # 测试普通用户无法获取所有用户列表
-def test_read_users_forbidden(db: Session):
+def test_read_users_forbidden(client: TestClient, db: Session):
     # 创建普通用户和token
     db_user, access_token = create_test_user_and_token(db)
     
@@ -91,7 +88,7 @@ def test_read_users_forbidden(db: Session):
     assert response.status_code == 403
 
 # 测试管理员创建新用户
-def test_create_user(db: Session):
+def test_create_user(client: TestClient, db: Session):
     # 创建管理员用户和token
     db_user, access_token = create_test_user_and_token(db, is_superuser=True)
     
@@ -112,7 +109,7 @@ def test_create_user(db: Session):
     assert user_data["role"] == UserRole.PROPERTY
 
 # 测试管理员获取特定用户信息
-def test_read_user(db: Session):
+def test_read_user(client: TestClient, db: Session):
     # 创建管理员用户和token
     admin_user, admin_token = create_test_user_and_token(db, is_superuser=True)
     
@@ -136,7 +133,7 @@ def test_read_user(db: Session):
     assert user_data["email"] == "usertoread@example.com"
 
 # 测试管理员更新特定用户信息
-def test_update_user(db: Session):
+def test_update_user(client: TestClient, db: Session):
     # 创建管理员用户和token
     admin_user, admin_token = create_test_user_and_token(db, is_superuser=True)
     

@@ -103,7 +103,7 @@ async def update_user_me(
 ) -> Any:
     """更新当前用户信息"""
     # 不允许普通用户修改自己的角色和超级管理员状态
-    if user_in.role is not None or user_in.is_superuser is not None:
+    if user_in.role is not None or user_in.is_superuser is not False:
         if not current_user.is_superuser:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

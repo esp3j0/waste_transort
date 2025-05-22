@@ -16,6 +16,10 @@ class RecyclingStatus(str, Enum):
     FULL = "full"  # 容量已满
     INACTIVE = "inactive"  # 暂停运营
 
+# 更新回收状态
+class RecyclingStatusUpdate(BaseModel):
+    status: RecyclingStatus
+
 # 共享属性
 class RecyclingBase(BaseModel):
     name: str

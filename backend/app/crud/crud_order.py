@@ -1,5 +1,8 @@
 from typing import Any, Dict, Optional, Union, List
 from sqlalchemy.orm import Session
+from fastapi.encoders import jsonable_encoder
+import datetime
+import uuid
 
 from app.crud.base import CRUDBase
 from app.models.order import Order, OrderStatus
@@ -10,21 +13,33 @@ class CRUDOrder(CRUDBase[Order, OrderCreate, OrderUpdate]):
         """根据订单编号获取订单"""
         return db.query(Order).filter(Order.order_number == order_number).first()
     
-    def get_by_customer(self, db: Session, *, customer_id: int, skip: int = 0, limit: int = 100) -> List[Order]:
+    def get_by_customer(self, db: Session, *, customer_id: int, skip: int = 0, limit: int = 100, status: Optional[str] = None) -> List[Order]:
         """获取客户的所有订单"""
-        return db.query(Order).filter(Order.customer_id == customer_id).offset(skip).limit(limit).all()
+        query = db.query(Order).filter(Order.customer_id == customer_id)
+        if status:
+            query = query.filter(Order.status == status)
+        return query.offset(skip).limit(limit).all()
     
-    def get_by_property_manager(self, db: Session, *, property_manager_id: int, skip: int = 0, limit: int = 100) -> List[Order]:
+    def get_by_property_manager(self, db: Session, *, manager_id: int, skip: int = 0, limit: int = 100, status: Optional[str] = None) -> List[Order]:
         """获取物业管理员负责的所有订单"""
-        return db.query(Order).filter(Order.property_manager_id == property_manager_id).offset(skip).limit(limit).all()
+        query = db.query(Order).filter(Order.property_manager_id == manager_id)
+        if status:
+            query = query.filter(Order.status == status)
+        return query.offset(skip).limit(limit).all()
     
-    def get_by_transport_manager(self, db: Session, *, transport_manager_id: int, skip: int = 0, limit: int = 100) -> List[Order]:
+    def get_by_transport_manager(self, db: Session, *, manager_id: int, skip: int = 0, limit: int = 100, status: Optional[str] = None) -> List[Order]:
         """获取运输管理员负责的所有订单"""
-        return db.query(Order).filter(Order.transport_manager_id == transport_manager_id).offset(skip).limit(limit).all()
+        query = db.query(Order).filter(Order.transport_manager_id == manager_id)
+        if status:
+            query = query.filter(Order.status == status)
+        return query.offset(skip).limit(limit).all()
     
-    def get_by_recycling_manager(self, db: Session, *, recycling_manager_id: int, skip: int = 0, limit: int = 100) -> List[Order]:
+    def get_by_recycling_manager(self, db: Session, *, manager_id: int, skip: int = 0, limit: int = 100, status: Optional[str] = None) -> List[Order]:
         """获取回收站管理员负责的所有订单"""
-        return db.query(Order).filter(Order.recycling_manager_id == recycling_manager_id).offset(skip).limit(limit).all()
+        query = db.query(Order).filter(Order.recycling_manager_id == manager_id)
+        if status:
+            query = query.filter(Order.status == status)
+        return query.offset(skip).limit(limit).all()
     
     def get_by_driver(self, db: Session, *, driver_id: int, skip: int = 0, limit: int = 100) -> List[Order]:
         """获取司机负责的所有订单"""
@@ -43,5 +58,25 @@ class CRUDOrder(CRUDBase[Order, OrderCreate, OrderUpdate]):
         update_data = {"status": status}
         update_data.update(kwargs)
         return super().update(db, db_obj=db_obj, obj_in=update_data)
+    
+    def create_with_customer(self, db: Session, *, obj_in: OrderCreate, customer_id: int) -> Order:
+        """创建订单并关联客户ID"""
+        obj_in_data = jsonable_encoder(obj_in)
+        # 生成唯一订单编号
+        current_time = datetime.datetime.now()
+        order_number = f"ORD-{current_time.strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"
+        
+        db_obj = Order(**obj_in_data, customer_id=customer_id, order_number=order_number)
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
+    def get_multi(self, db: Session, *, skip: int = 0, limit: int = 100, status: Optional[str] = None) -> List[Order]:
+        """获取多个订单，支持状态过滤"""
+        query = db.query(self.model)
+        if status:
+            query = query.filter(Order.status == status)
+        return query.offset(skip).limit(limit).all()
 
 order = CRUDOrder(Order)

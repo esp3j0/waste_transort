@@ -1,5 +1,6 @@
 from typing import Any, Dict, Optional, Union, List
 from sqlalchemy.orm import Session
+from fastapi.encoders import jsonable_encoder
 
 from app.crud.base import CRUDBase
 from app.models.recycling import Recycling, RecyclingStatus
@@ -18,9 +19,12 @@ class CRUDRecycling(CRUDBase[Recycling, RecyclingCreate, RecyclingUpdate]):
         """根据回收站状态获取回收站信息"""
         return db.query(Recycling).filter(Recycling.status == status).offset(skip).limit(limit).all()
     
-    def get_by_manager(self, db: Session, *, manager_id: int, skip: int = 0, limit: int = 100) -> List[Recycling]:
+    def get_by_manager(self, db: Session, *, manager_id: int, skip: int = 0, limit: int = 100, status: Optional[str] = None) -> List[Recycling]:
         """获取管理员负责的所有回收站信息"""
-        return db.query(Recycling).filter(Recycling.manager_id == manager_id).offset(skip).limit(limit).all()
+        query = db.query(Recycling).filter(Recycling.manager_id == manager_id)
+        if status:
+            query = query.filter(Recycling.status == status)
+        return query.offset(skip).limit(limit).all()
     
     def get_active_stations(self, db: Session, *, skip: int = 0, limit: int = 100) -> List[Recycling]:
         """获取所有正常运营的回收站"""
@@ -37,5 +41,14 @@ class CRUDRecycling(CRUDBase[Recycling, RecyclingCreate, RecyclingUpdate]):
         """更新回收站当前负载"""
         new_load = db_obj.current_load + additional_load
         return super().update(db, db_obj=db_obj, obj_in={"current_load": new_load})
+    
+    def create_with_manager(self, db: Session, *, obj_in: RecyclingCreate, manager_id: int) -> Recycling:
+        """创建回收站信息并关联管理员ID"""
+        obj_in_data = jsonable_encoder(obj_in)
+        db_obj = Recycling(**obj_in_data, manager_id=manager_id)
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
 
 recycling = CRUDRecycling(Recycling)
