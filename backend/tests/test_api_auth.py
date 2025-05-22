@@ -7,10 +7,8 @@ from app.crud.crud_user import user
 from app.schemas.user import UserCreate
 from app.models.user import UserRole
 
-client = TestClient(app)
-
 # 测试登录API
-def test_login(db: Session):
+def test_login(client: TestClient, db: Session):
     # 创建测试用户
     user_in = UserCreate(
         username="testlogin",
@@ -34,7 +32,7 @@ def test_login(db: Session):
     assert token_data["token_type"] == "bearer"
 
 # 测试登录失败
-def test_login_wrong_password(db: Session):
+def test_login_wrong_password(client: TestClient, db: Session):
     # 创建测试用户
     user_in = UserCreate(
         username="testwrongpw",
@@ -55,7 +53,7 @@ def test_login_wrong_password(db: Session):
     assert response.status_code == 401
 
 # 测试注册API
-def test_register():
+def test_register(client: TestClient, db: Session):
     # 测试注册新用户
     register_data = {
         "username": "testregister",
@@ -72,7 +70,7 @@ def test_register():
     assert token_data["token_type"] == "bearer"
 
 # 测试重复注册
-def test_register_duplicate(db: Session):
+def test_register_duplicate(client: TestClient, db: Session):
     # 创建测试用户
     user_in = UserCreate(
         username="testduplicate",
@@ -97,7 +95,7 @@ def test_register_duplicate(db: Session):
     assert response.status_code == 400
 
 # 测试微信登录API
-def test_wx_login():
+def test_wx_login(client: TestClient, db: Session):
     # 由于微信登录需要真实的code，这里只测试接口是否可访问
     response = client.post("/api/v1/auth/wx-login?code=test_code")
     # 目前只是示例实现，应该返回200
