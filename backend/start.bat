@@ -24,6 +24,10 @@ if "%1"=="--migrate" (
     alembic upgrade head
 )
 
+REM 初始化数据库
+echo 正在初始化数据库...
+python -m app.db.init_db
+
 REM 启动应用
 echo 启动应用...
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload

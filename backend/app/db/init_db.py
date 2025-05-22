@@ -15,13 +15,14 @@ logger = logging.getLogger(__name__)
 # 确保所有模型都被导入
 from app.models import user, property, order, transport, recycling  # noqa
 
-def init_db(db: Session) -> None:
-    """初始化数据库"""
-    # 创建所有表
+def init_db() -> None:
+    """初始化数据库，创建所有表"""
     Base.metadata.create_all(bind=engine)
-    
-    # 创建超级管理员账户
-    create_first_superuser(db)
+
+if __name__ == "__main__":
+    print("创建数据库表...")
+    init_db()
+    print("数据库表创建完成！")
 
 def create_first_superuser(db: Session) -> None:
     """创建第一个超级管理员账户"""
