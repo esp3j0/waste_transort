@@ -16,7 +16,8 @@
             "module": "pytest",
             "args": [
                 "${file}",
-                "-v"
+                "-v",
+                "--tb=long"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
@@ -31,7 +32,8 @@
             "module": "pytest",
             "args": [
                 "backend/tests",
-                "-v"
+                "-v",
+                "--tb=long"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
@@ -46,7 +48,8 @@
             "module": "pytest",
             "args": [
                 "backend/tests/test_crud.py::test_create_user",
-                "-v"
+                "-v",
+                "--tb=long"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
