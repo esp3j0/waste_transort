@@ -16,6 +16,22 @@ class OrderStatus(str, enum.Enum):
     COMPLETED = "completed"  # 完成
     CANCELLED = "cancelled"  # 取消
 
+class RenovationStatus(str, enum.Enum):
+    """装修报备状态枚举"""
+    PENDING = "pending"  # 待审核
+    APPROVED = "approved"  # 已批准
+    REJECTED = "rejected"  # 已拒绝
+    IN_PROGRESS = "in_progress"  # 装修中
+    COMPLETED = "completed"  # 已完成
+    CANCELLED = "cancelled"  # 已取消
+
+class RenovationType(str, enum.Enum):
+    """装修类型枚举"""
+    FULL = "full"  # 全屋装修
+    PARTIAL = "partial"  # 局部装修
+    MINOR = "minor"  # 小规模装修
+    MAINTENANCE = "maintenance"  # 维修
+
 class Order(Base):
     """订单模型"""
     id = Column(Integer, primary_key=True, index=True)
@@ -24,12 +40,8 @@ class Order(Base):
     # 客户信息
     customer_id = Column(Integer, ForeignKey("user.id"))
     customer = relationship("User", back_populates="orders", foreign_keys=[customer_id])
-    customer_address = Column(String)  # 客户地址
-    community_name = Column(String)  # 小区名称
-    building_number = Column(String)  # 楼栋号
-    room_number = Column(String)  # 房间号
-    contact_name = Column(String)  # 联系人姓名
-    contact_phone = Column(String)  # 联系电话
+    address_id = Column(Integer, ForeignKey("address.id"))  # 地址ID
+    address = relationship("Address")  # 地址关系
     
     # 订单信息
     waste_type = Column(String)  # 垃圾类型
@@ -72,3 +84,50 @@ class Order(Base):
     price = Column(Float, default=0.0)  # 订单价格
     payment_status = Column(String, default="unpaid")  # 支付状态
     payment_time = Column(DateTime, nullable=True)  # 支付时间
+
+class Renovation(Base):
+    """装修报备模型"""
+    id = Column(Integer, primary_key=True, index=True)
+    renovation_number = Column(String, unique=True, index=True)  # 报备编号
+    
+    # 基本信息
+    customer_id = Column(Integer, ForeignKey("user.id"))  # 报备人ID
+    customer = relationship("User", foreign_keys=[customer_id])  # 报备人信息
+    address_id = Column(Integer, ForeignKey("address.id"))  # 地址ID
+    address = relationship("Address")  # 地址关系
+    
+    # 装修信息
+    renovation_type = Column(String, default=RenovationType.PARTIAL)  # 装修类型
+    start_date = Column(DateTime)  # 计划开始时间
+    end_date = Column(DateTime)  # 计划结束时间
+    actual_start_date = Column(DateTime, nullable=True)  # 实际开始时间
+    actual_end_date = Column(DateTime, nullable=True)  # 实际结束时间
+    
+    # 装修公司信息
+    company_name = Column(String, nullable=True)  # 装修公司名称
+    company_contact = Column(String, nullable=True)  # 装修公司联系人
+    company_phone = Column(String, nullable=True)  # 装修公司电话
+    
+    # 装修内容
+    description = Column(Text)  # 装修内容描述
+    scope = Column(Text)  # 装修范围
+    materials = Column(Text, nullable=True)  # 主要材料清单
+    
+    # 物业信息
+    property_id = Column(Integer, ForeignKey("property.id"))  # 物业ID
+    property = relationship("Property", foreign_keys=[property_id])  # 物业信息
+    property_manager_id = Column(Integer, ForeignKey("user.id"), nullable=True)  # 物业审核人ID
+    property_manager = relationship("User", foreign_keys=[property_manager_id])  # 物业审核人
+    
+    # 审核信息
+    status = Column(String, default=RenovationStatus.PENDING)  # 报备状态
+    review_time = Column(DateTime, nullable=True)  # 审核时间
+    review_notes = Column(Text, nullable=True)  # 审核意见
+    
+    # 时间信息
+    created_at = Column(DateTime, default=datetime.utcnow)  # 创建时间
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # 更新时间
+    
+    # 其他信息
+    notes = Column(Text, nullable=True)  # 备注
+    attachments = Column(Text, nullable=True)  # 附件（可以存储文件路径或URL）

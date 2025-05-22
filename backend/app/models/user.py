@@ -34,6 +34,7 @@ class User(Base):
     wx_openid = Column(String(64), unique=True, index=True, nullable=True)  # 微信 OpenID 通常 64 字符
 
     # 关系
+    addresses = relationship("Address", back_populates="user")  # 地址关系
     orders = relationship("Order", back_populates="customer", foreign_keys="Order.customer_id")
     property_orders = relationship("Order", back_populates="property_manager", foreign_keys="Order.property_manager_id")
     transport_orders = relationship("Order", back_populates="transport_manager", foreign_keys="Order.transport_manager_id")

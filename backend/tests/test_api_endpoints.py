@@ -2,12 +2,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.crud import user, order, property, transport, recycling
+from app.crud import user, order, property, transport, recycling, address
 from app.schemas.user import UserCreate
 from app.schemas.order import OrderCreate, OrderStatusUpdate
 from app.schemas.property import PropertyCreate
 from app.schemas.transport import TransportCreate
 from app.schemas.recycling import RecyclingCreate
+from app.schemas.address import AddressCreate
 from app.models.user import UserRole
 from app.models.order import OrderStatus
 from app.models.transport import DriverStatus
@@ -30,6 +31,19 @@ def create_user_with_role(db: Session, role, is_superuser=False):
     access_token = create_access_token(db_user.id)
     return db_user, access_token
 
+# 辅助函数：创建测试地址
+def create_test_address(db: Session, user_id: int):
+    address_in = AddressCreate(
+        address="测试地址",
+        community_name="测试小区",
+        building_number="1",
+        room_number="101",
+        contact_name="测试联系人",
+        contact_phone="13800001111",
+        is_default=True
+    )
+    return address.create_with_user(db, obj_in=address_in, user_id=user_id)
+
 # ============ 订单API测试 ============
 
 # 测试创建订单
@@ -37,14 +51,12 @@ def test_create_order(client: TestClient, db: Session):
     # 创建客户用户
     customer, token = create_user_with_role(db, UserRole.CUSTOMER)
     
+    # 创建测试地址
+    test_address = create_test_address(db, customer.id)
+    
     # 测试创建订单
     order_data = {
-        "customer_address": "测试地址",
-        "community_name": "测试小区",
-        "building_number": "1",
-        "room_number": "101",
-        "contact_name": "测试联系人",
-        "contact_phone": "13800001111",
+        "address_id": test_address.id,
         "waste_type": "建筑垃圾",
         "waste_volume": 2.5
     }
@@ -52,7 +64,7 @@ def test_create_order(client: TestClient, db: Session):
     response = client.post("/api/v1/orders/", json=order_data, headers=headers)
     assert response.status_code == 201
     order_data = response.json()
-    assert order_data["community_name"] == "测试小区"
+    assert order_data["address"]["community_name"] == "测试小区"
     assert order_data["status"] == OrderStatus.PENDING
 
 # 测试非客户用户创建订单（应该被禁止）
@@ -60,14 +72,12 @@ def test_create_order_forbidden(client: TestClient, db: Session):
     # 创建物业用户
     property_user, token = create_user_with_role(db, UserRole.PROPERTY)
     
+    # 创建测试地址
+    test_address = create_test_address(db, property_user.id)
+    
     # 测试物业用户创建订单
     order_data = {
-        "customer_address": "测试地址",
-        "community_name": "测试小区",
-        "building_number": "1",
-        "room_number": "101",
-        "contact_name": "测试联系人",
-        "contact_phone": "13800001111",
+        "address_id": test_address.id,
         "waste_type": "建筑垃圾",
         "waste_volume": 2.5
     }
@@ -77,15 +87,13 @@ def test_create_order_forbidden(client: TestClient, db: Session):
 
 # 测试获取订单列表
 def test_read_orders(client: TestClient, db: Session):
-    # 创建客户用户和订单
+    # 创建客户用户和地址
     customer, token = create_user_with_role(db, UserRole.CUSTOMER)
+    test_address = create_test_address(db, customer.id)
+    
+    # 创建订单
     order_in = OrderCreate(
-        customer_address="测试地址",
-        community_name="测试小区",
-        building_number="1",
-        room_number="101",
-        contact_name="测试联系人",
-        contact_phone="13800001111",
+        address_id=test_address.id,
         waste_type="建筑垃圾",
         waste_volume=2.5
     )
@@ -101,15 +109,13 @@ def test_read_orders(client: TestClient, db: Session):
 
 # 测试获取特定订单
 def test_read_order(client: TestClient, db: Session):
-    # 创建客户用户和订单
+    # 创建客户用户和地址
     customer, token = create_user_with_role(db, UserRole.CUSTOMER)
+    test_address = create_test_address(db, customer.id)
+    
+    # 创建订单
     order_in = OrderCreate(
-        customer_address="测试地址",
-        community_name="测试小区",
-        building_number="1",
-        room_number="101",
-        contact_name="测试联系人",
-        contact_phone="13800001111",
+        address_id=test_address.id,
         waste_type="建筑垃圾",
         waste_volume=2.5
     )
@@ -121,19 +127,17 @@ def test_read_order(client: TestClient, db: Session):
     assert response.status_code == 200
     order_data = response.json()
     assert order_data["id"] == db_order.id
-    assert order_data["community_name"] == "测试小区"
+    assert order_data["address"]["community_name"] == "测试小区"
 
 # 测试更新订单状态
 def test_update_order_status(client: TestClient, db: Session):
-    # 创建客户用户和订单
+    # 创建客户用户和地址
     customer, customer_token = create_user_with_role(db, UserRole.CUSTOMER)
+    test_address = create_test_address(db, customer.id)
+    
+    # 创建订单
     order_in = OrderCreate(
-        customer_address="测试地址",
-        community_name="测试小区",
-        building_number="1",
-        room_number="101",
-        contact_name="测试联系人",
-        contact_phone="13800001111",
+        address_id=test_address.id,
         waste_type="建筑垃圾",
         waste_volume=2.5
     )
