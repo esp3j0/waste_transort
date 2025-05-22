@@ -10,11 +10,17 @@ class VehicleType(str, Enum):
     LARGE = "large"  # 大型车辆
     SPECIAL = "special"  # 特种车辆
 
+
+
 class DriverStatus(str, Enum):
     AVAILABLE = "available"  # 可用
     BUSY = "busy"  # 忙碌
     OFF_DUTY = "off_duty"  # 休息
     INACTIVE = "inactive"  # 未激活
+
+# 更新司机状态
+class DriverStatusUpdate(BaseModel):
+    status: DriverStatus
 
 # 共享属性
 class TransportBase(BaseModel):

@@ -47,7 +47,7 @@
             "request": "launch",
             "module": "pytest",
             "args": [
-                "backend/tests/test_crud.py::test_create_user",
+                "backend/tests/test_api_endpoints.py::test_update_driver_status",
                 "-v",
                 "--tb=auto"
             ],

@@ -6,7 +6,7 @@ from app.api.deps import get_current_user, get_current_active_user
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.models.recycling import Recycling, RecyclingStatus
-from app.schemas.recycling import RecyclingCreate, RecyclingUpdate, RecyclingResponse
+from app.schemas.recycling import RecyclingCreate, RecyclingUpdate, RecyclingResponse, RecyclingStatusUpdate
 from app.crud.crud_recycling import recycling as crud_recycling
 
 router = APIRouter()
@@ -123,7 +123,7 @@ async def update_recycling_status(
     *,
     db: Session = Depends(get_db),
     recycling_id: int,
-    status: RecyclingStatus,
+    status_update: RecyclingStatusUpdate,
     current_user: User = Depends(get_current_active_user)
 ) -> Any:
     """更新回收站状态"""
@@ -147,7 +147,7 @@ async def update_recycling_status(
                 detail="只能更新自己管理的回收站状态"
             )
     
-    recycling_update = RecyclingUpdate(status=status)
+    recycling_update = RecyclingUpdate(status=status_update.status)
     updated_recycling = crud_recycling.update(db, db_obj=recycling_obj, obj_in=recycling_update)
     return updated_recycling
 

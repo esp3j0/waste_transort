@@ -6,7 +6,7 @@ from app.api.deps import get_current_user, get_current_active_user
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.models.transport import Transport, DriverStatus
-from app.schemas.transport import TransportCreate, TransportUpdate, TransportResponse
+from app.schemas.transport import TransportCreate, TransportUpdate, TransportResponse, DriverStatusUpdate
 from app.crud.crud_transport import transport as crud_transport
 
 router = APIRouter()
@@ -123,7 +123,7 @@ async def update_driver_status(
     *,
     db: Session = Depends(get_db),
     transport_id: int,
-    status: DriverStatus,
+    status_update: DriverStatusUpdate,
     current_user: User = Depends(get_current_active_user)
 ) -> Any:
     """更新司机状态"""
@@ -147,7 +147,7 @@ async def update_driver_status(
                 detail="只能更新自己管理的司机状态"
             )
     
-    transport_update = TransportUpdate(driver_status=status)
+    transport_update = TransportUpdate(driver_status=status_update.status)
     updated_transport = crud_transport.update(db, db_obj=transport_obj, obj_in=transport_update)
     return updated_transport
 
