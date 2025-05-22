@@ -6,6 +6,8 @@ import uuid
 
 from app.crud.base import CRUDBase
 from app.models.order import Order, OrderStatus
+from app.models.property import Property
+from app.models.property_manager import PropertyManager
 from app.schemas.order import OrderCreate, OrderUpdate
 
 class CRUDOrder(CRUDBase[Order, OrderCreate, OrderUpdate]):
@@ -22,7 +24,17 @@ class CRUDOrder(CRUDBase[Order, OrderCreate, OrderUpdate]):
     
     def get_by_property_manager(self, db: Session, *, manager_id: int, skip: int = 0, limit: int = 100, status: Optional[str] = None) -> List[Order]:
         """获取物业管理员负责的所有订单"""
-        query = db.query(Order).filter(Order.property_manager_id == manager_id)
+        # 获取管理员管理的所有物业
+        managed_properties = (
+            db.query(Property)
+            .join(PropertyManager)
+            .filter(PropertyManager.manager_id == manager_id)
+            .all()
+        )
+        property_ids = [p.id for p in managed_properties]
+        
+        # 获取这些物业的所有订单
+        query = db.query(Order).filter(Order.property_id.in_(property_ids))
         if status:
             query = query.filter(Order.status == status)
         return query.offset(skip).limit(limit).all()

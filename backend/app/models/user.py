@@ -39,3 +39,14 @@ class User(Base):
     property_orders = relationship("Order", back_populates="property_manager", foreign_keys="Order.property_manager_id")
     transport_orders = relationship("Order", back_populates="transport_manager", foreign_keys="Order.transport_manager_id")
     recycling_orders = relationship("Order", back_populates="recycling_manager", foreign_keys="Order.recycling_manager_id")
+    
+    # 物业管理员关系
+    managed_properties = relationship("PropertyManager", back_populates="manager")
+    
+    @property
+    def primary_property(self):
+        """获取用户作为主要管理员的物业公司"""
+        for property_manager in self.managed_properties:
+            if property_manager.is_primary:
+                return property_manager.property
+        return None

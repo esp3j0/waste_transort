@@ -4,6 +4,7 @@ from .transport import TransportBase, TransportCreate, TransportUpdate, Transpor
 from .recycling import RecyclingBase, RecyclingCreate, RecyclingUpdate, RecyclingResponse
 from .property import PropertyBase, PropertyCreate, PropertyUpdate, PropertyResponse
 from .address import AddressBase, AddressCreate, AddressUpdate, AddressResponse
+from .community import CommunityBase, CommunityCreate, CommunityUpdate, CommunityResponse
 
 # 导出所有模型
 __all__ = [
@@ -31,5 +32,9 @@ __all__ = [
     "AddressBase",
     "AddressCreate",
     "AddressUpdate",
-    "AddressResponse"
+    "AddressResponse",
+    "CommunityBase",
+    "CommunityCreate",
+    "CommunityUpdate",
+    "CommunityResponse"
 ] 
