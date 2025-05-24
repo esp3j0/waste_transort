@@ -1,5 +1,5 @@
 from typing import Any, Dict, Optional, Union, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from fastapi.encoders import jsonable_encoder
 import datetime
 import uuid
@@ -8,6 +8,8 @@ from app.crud.base import CRUDBase
 from app.models.order import Order, OrderStatus
 from app.models.property import Property
 from app.models.property_manager import PropertyManager
+from app.models.address import Address
+from app.models.community import Community
 from app.schemas.order import OrderCreate, OrderUpdate
 
 class CRUDOrder(CRUDBase[Order, OrderCreate, OrderUpdate]):
@@ -20,54 +22,96 @@ class CRUDOrder(CRUDBase[Order, OrderCreate, OrderUpdate]):
         query = db.query(Order).filter(Order.customer_id == customer_id)
         if status:
             query = query.filter(Order.status == status)
-        return query.offset(skip).limit(limit).all()
+        return query.options(joinedload(Order.address).joinedload(Address.community)).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
     
-    def get_by_property_manager(self, db: Session, *, manager_id: int, skip: int = 0, limit: int = 100, status: Optional[str] = None) -> List[Order]:
-        """获取物业管理员负责的所有订单"""
-        # 获取管理员管理的所有物业
-        managed_properties = (
-            db.query(Property)
-            .join(PropertyManager)
-            .filter(PropertyManager.manager_id == manager_id)
-            .all()
-        )
-        property_ids = [p.id for p in managed_properties]
+    def get_by_property_manager(
+        self, db: Session, *, manager_user_id: int, skip: int = 0, limit: int = 100, status: Optional[str] = None
+    ) -> List[Order]:
+        """获取物业管理员（主要或非主要）相关的订单列表"""
         
-        # 获取这些物业的所有订单
-        query = db.query(Order).filter(Order.property_id.in_(property_ids))
+        property_manager_records = db.query(PropertyManager).filter(PropertyManager.manager_id == manager_user_id).all()
+        
+        if not property_manager_records:
+            return []
+
+        accessible_community_ids = set()
+
+        for pm_record in property_manager_records:
+            if pm_record.is_primary:
+                # 主要管理员：获取其物业公司管理的所有小区ID
+                if pm_record.property_id:
+                    # property_obj = db.query(Property).filter(Property.id == pm_record.property_id).options(joinedload(Property.communities)).first()
+                    # Query communities directly associated with the property
+                    communities_of_property = db.query(Community.id).filter(Community.property_id == pm_record.property_id).all()
+                    for comm_id_tuple in communities_of_property:
+                        accessible_community_ids.add(comm_id_tuple[0])
+            else:
+                # 非主要管理员：获取其直接关联的小区ID
+                if pm_record.community_id:
+                    accessible_community_ids.add(pm_record.community_id)
+        
+        if not accessible_community_ids:
+            return []
+        
+        # 查询这些小区下的所有地址ID
+        # address_ids_query = db.query(Address.id).filter(Address.community_id.in_(list(accessible_community_ids)))
+        # address_ids = [addr_id_tuple[0] for addr_id_tuple in address_ids_query.all()]
+        # if not address_ids:
+        #     return []
+
+        # 查询这些地址关联的订单
+        # query = db.query(Order).filter(Order.address_id.in_(address_ids))
+        
+        # Optimized query: Join Order -> Address -> Community and filter by community_ids
+        query = (
+            db.query(Order)
+            .join(Order.address)
+            .filter(Address.community_id.in_(list(accessible_community_ids)))
+        )
+
         if status:
             query = query.filter(Order.status == status)
-        return query.offset(skip).limit(limit).all()
+        
+        return query.options(joinedload(Order.address).joinedload(Address.community)).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
     
     def get_by_transport_manager(self, db: Session, *, manager_id: int, skip: int = 0, limit: int = 100, status: Optional[str] = None) -> List[Order]:
         """获取运输管理员负责的所有订单"""
         query = db.query(Order).filter(Order.transport_manager_id == manager_id)
         if status:
             query = query.filter(Order.status == status)
-        return query.offset(skip).limit(limit).all()
+        return query.options(joinedload(Order.address).joinedload(Address.community)).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
     
     def get_by_recycling_manager(self, db: Session, *, manager_id: int, skip: int = 0, limit: int = 100, status: Optional[str] = None) -> List[Order]:
         """获取回收站管理员负责的所有订单"""
         query = db.query(Order).filter(Order.recycling_manager_id == manager_id)
         if status:
             query = query.filter(Order.status == status)
-        return query.offset(skip).limit(limit).all()
+        return query.options(joinedload(Order.address).joinedload(Address.community)).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
     
     def get_by_driver(self, db: Session, *, driver_id: int, skip: int = 0, limit: int = 100) -> List[Order]:
         """获取司机负责的所有订单"""
-        return db.query(Order).filter(Order.driver_id == driver_id).offset(skip).limit(limit).all()
+        return db.query(Order).filter(Order.driver_id == driver_id).options(joinedload(Order.address).joinedload(Address.community)).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
     
     def get_by_recycling_station(self, db: Session, *, recycling_station_id: int, skip: int = 0, limit: int = 100) -> List[Order]:
         """获取回收站的所有订单"""
-        return db.query(Order).filter(Order.recycling_station_id == recycling_station_id).offset(skip).limit(limit).all()
+        return db.query(Order).filter(Order.recycling_station_id == recycling_station_id).options(joinedload(Order.address).joinedload(Address.community)).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
     
     def get_by_status(self, db: Session, *, status: str, skip: int = 0, limit: int = 100) -> List[Order]:
         """根据状态获取订单"""
-        return db.query(Order).filter(Order.status == status).offset(skip).limit(limit).all()
+        return db.query(Order).filter(Order.status == status).options(joinedload(Order.address).joinedload(Address.community)).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
     
     def update_status(self, db: Session, *, db_obj: Order, status: str, **kwargs) -> Order:
         """更新订单状态"""
         update_data = {"status": status}
+        # Ensure datetime is set for specific status updates if provided in kwargs
+        if status == OrderStatus.PROPERTY_CONFIRMED and "property_confirm_time" not in kwargs:
+            kwargs["property_confirm_time"] = datetime.datetime.utcnow()
+        elif status == OrderStatus.DELIVERED and "delivery_time" not in kwargs:
+            kwargs["delivery_time"] = datetime.datetime.utcnow()
+        elif status == OrderStatus.RECYCLING_CONFIRMED and "recycling_confirm_time" not in kwargs:
+            kwargs["recycling_confirm_time"] = datetime.datetime.utcnow()
+        # Add more specific time updates for other statuses if needed
+
         update_data.update(kwargs)
         return super().update(db, db_obj=db_obj, obj_in=update_data)
     
@@ -75,9 +119,14 @@ class CRUDOrder(CRUDBase[Order, OrderCreate, OrderUpdate]):
         """创建订单并关联客户ID"""
         obj_in_data = jsonable_encoder(obj_in)
         # 生成唯一订单编号
-        current_time = datetime.datetime.now()
+        current_time = datetime.datetime.now() # Use datetime.datetime.now(datetime.timezone.utc) for timezone aware
         order_number = f"ORD-{current_time.strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"
         
+        # Ensure address exists and is valid
+        address_obj = db.query(Address).filter(Address.id == obj_in.address_id, Address.user_id == customer_id).first()
+        if not address_obj:
+            raise ValueError(f"无效的地址ID: {obj_in.address_id} 或该地址不属于用户 {customer_id}")
+
         db_obj = Order(**obj_in_data, customer_id=customer_id, order_number=order_number)
         db.add(db_obj)
         db.commit()
@@ -89,6 +138,6 @@ class CRUDOrder(CRUDBase[Order, OrderCreate, OrderUpdate]):
         query = db.query(self.model)
         if status:
             query = query.filter(Order.status == status)
-        return query.offset(skip).limit(limit).all()
+        return query.options(joinedload(Order.address).joinedload(Address.community)).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
 
 order = CRUDOrder(Order)
