@@ -12,6 +12,7 @@ from app.schemas.transport import TransportCreate
 from app.schemas.recycling import RecyclingCreate
 from app.schemas.address import AddressCreate
 from app.schemas.property import PropertyCreate
+from app.schemas.property_manager import PropertyManagerCreate, PropertyManagerUpdate
 from app.schemas.community import CommunityCreate
 
 # 测试用户CRUD操作
@@ -196,12 +197,12 @@ def test_add_property_manager(db: Session):
     db_new_manager = user.create(db, obj_in=new_manager_in)
     
     # 添加新管理员
-    manager_data = {
-        "manager_id": db_new_manager.id,
-        "role": "普通管理员",
-        "is_primary": False
-    }
-    db_manager = property.add_manager(db, property_id=db_property.id, manager_data=manager_data)
+    manager_data = PropertyManagerCreate(
+        manager_id=db_new_manager.id,
+        role="普通管理员",
+        is_primary=False
+    )
+    db_manager = property.add_manager(db, property_id=db_property.id, obj_in=manager_data)
     assert db_manager.manager_id == db_new_manager.id
     assert db_manager.role == "普通管理员"
     assert not db_manager.is_primary
@@ -247,19 +248,19 @@ def test_update_property_manager(db: Session):
     db_new_manager = user.create(db, obj_in=new_manager_in)
     
     # 添加新管理员
-    manager_data = {
-        "manager_id": db_new_manager.id,
-        "role": "普通管理员",
-        "is_primary": False
-    }
-    db_manager = property.add_manager(db, property_id=db_property.id, manager_data=manager_data)
+    manager_data = PropertyManagerCreate(
+        manager_id=db_new_manager.id,
+        role="普通管理员",
+        is_primary=False
+    )
+    db_manager = property.add_manager(db, property_id=db_property.id, obj_in=manager_data)
     
     # 更新管理员信息
-    update_data = {
-        "role": "高级管理员",
-        "is_primary": False
-    }
-    updated_manager = property.update_manager(db, manager_id=db_manager.id, manager_data=update_data)
+    update_data = PropertyManagerUpdate(
+        role="高级管理员",
+        is_primary=False
+    )
+    updated_manager = property.update_manager(db, manager_id=db_manager.id, obj_in=update_data)
     assert updated_manager.role == "高级管理员"
     assert not updated_manager.is_primary
 
@@ -303,12 +304,12 @@ def test_remove_property_manager(db: Session):
     db_new_manager = user.create(db, obj_in=new_manager_in)
     
     # 添加新管理员
-    manager_data = {
-        "manager_id": db_new_manager.id,
-        "role": "普通管理员",
-        "is_primary": False
-    }
-    db_manager = property.add_manager(db, property_id=db_property.id, manager_data=manager_data)
+    manager_data = PropertyManagerCreate(
+        manager_id=db_new_manager.id,
+        role="普通管理员",
+        is_primary=False
+    )
+    db_manager = property.add_manager(db, property_id=db_property.id, obj_in=manager_data)
     
     # 移除管理员
     property.remove_manager(db, manager_id=db_manager.id)

@@ -1,21 +1,25 @@
 import pytest
+import random
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.crud import user, property, community
 from app.schemas.user import UserCreate
-from app.schemas.property import PropertyCreate, PropertyManagerCreate, PropertyManagerUpdate
+from app.schemas.property import PropertyCreate, PropertyUpdate, PropertyResponse
+from app.schemas.property_manager import PropertyManagerCreate, PropertyManagerUpdate, PropertyManagerResponse
 from app.schemas.community import CommunityCreate
 from app.models.user import UserRole
 from app.core.security import create_access_token
 
 # 辅助函数：创建不同角色的测试用户并返回token
-def create_user_with_role(db: Session, role, is_superuser=False, username_suffix=""):
-    username = f"test{role.lower()}{username_suffix}"
+def create_user_with_role(db: Session, role, is_superuser=False,username_suffix="_primary"):
+    random_number = random.randint(1000, 9999)
+    username = f"test{role.lower()}_{random_number}{username_suffix}"
+    
     user_in = UserCreate(
         username=username,
         email=f"{username}@example.com",
-        phone=f"1380000{role.value}",
+        phone=f"1380000{random_number}",
         password="testpassword",
         full_name=f"测试{role.name}用户",
         role=role,
@@ -190,13 +194,13 @@ def test_remove_primary_manager_failure(client: TestClient, db: Session):
 # 测试非管理员用户添加管理员（应该失败）
 def test_add_manager_unauthorized(client: TestClient, db: Session):
     # 创建普通物业用户和物业
-    property_user, token = create_user_with_role(db, UserRole.PROPERTY, username_suffix="_unauthorized")
+    property_user, token = create_user_with_role(db, UserRole.PROPERTY, username_suffix="_primary")
     test_property = create_test_property(db, property_user.id)
     
     # 创建新的管理员用户
     new_manager, _ = create_user_with_role(db, UserRole.PROPERTY, username_suffix="_new")
     
-    # 测试添加管理员（应该失败）
+    # 主管理员测试添加管理员（应该成功）
     manager_data = {
         "manager_id": new_manager.id,
         "role": "普通管理员",
@@ -208,5 +212,14 @@ def test_add_manager_unauthorized(client: TestClient, db: Session):
         json=manager_data,
         headers=headers
     )
+    assert response.status_code == 200
+    new_token = create_access_token(new_manager.id)
+    headers = {"Authorization": f"Bearer {new_token}"}
+    response = client.post(
+        f"/api/v1/properties/{test_property.id}/managers",
+        json=manager_data,
+        headers=headers
+    )
     assert response.status_code == 403
+
     assert "只有主要管理员可以添加其他管理员" in response.json()["detail"] 

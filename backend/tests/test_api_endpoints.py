@@ -1,4 +1,5 @@
 import pytest
+import random
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -18,11 +19,13 @@ from app.core.security import create_access_token
 
 # 辅助函数：创建不同角色的测试用户并返回token
 def create_user_with_role(db: Session, role, is_superuser=False):
-    username = f"test{role.lower()}"
+    random_number = random.randint(1000, 9999)
+    username = f"test{role.lower()}_{random_number}"
+    
     user_in = UserCreate(
         username=username,
         email=f"{username}@example.com",
-        phone=f"1380000{role.value}",
+        phone=f"1380000{random_number}",
         password="testpassword",
         full_name=f"测试{role.name}用户",
         role=role,
@@ -300,15 +303,29 @@ def test_delete_property(client: TestClient, db: Session):
         name="测试小区",
         address="测试小区地址"
     )
-    community.create_with_property(db, obj_in=community_in, property_id=db_property.id)
+    db_community = community.create_with_property(db, obj_in=community_in, property_id=db_property.id)
     
-    # 测试删除物业信息
+    # 创建管理员用户
+    manager, manager_token = create_user_with_role(db, UserRole.ADMIN, is_superuser=True)
     headers = {"Authorization": f"Bearer {token}"}
-    response = client.delete(f"/api/v1/properties/{db_property.id}", headers=headers)
+    # 验证物业管理员存在
+    response = client.get(f"/api/v1/properties/{db_property.id}/managers", headers=headers)
+    assert response.status_code == 200
+
+    # 测试删除物业信息
+    response = client.delete(f"/api/v1/properties/{db_property.id}", headers={"Authorization": f"Bearer {manager_token}"})
     assert response.status_code == 200
     
     # 验证物业已被删除
     response = client.get(f"/api/v1/properties/{db_property.id}", headers=headers)
+    assert response.status_code == 404
+
+    # 验证物业管理员已被删除
+    response = client.get(f"/api/v1/properties/{db_property.id}/managers", headers=headers)
+    assert response.status_code == 404
+
+    # 验证社区已被删除
+    response = client.get(f"/api/v1/communities/{db_community.id}", headers=headers)
     assert response.status_code == 404
 
 # 测试添加物业管理员
@@ -319,8 +336,7 @@ def test_add_property_manager(client: TestClient, db: Session):
         name="测试物业",
         address="测试地址",
         contact_name="测试联系人",
-        contact_phone="13800001111",
-        community_name="测试小区"
+        contact_phone="13800001111"
     )
     db_property = property.create_with_manager(db, obj_in=property_in, manager_id=primary_manager.id)
     
@@ -354,7 +370,6 @@ def test_update_property_manager(client: TestClient, db: Session):
         address="测试地址",
         contact_name="测试联系人",
         contact_phone="13800001111",
-        community_name="测试小区"
     )
     db_property = property.create_with_manager(db, obj_in=property_in, manager_id=primary_manager.id)
     
@@ -379,7 +394,7 @@ def test_update_property_manager(client: TestClient, db: Session):
     # 测试更新管理员信息
     update_data = {
         "role": "高级管理员",
-        "is_primary": False
+        "is_primary": False,
     }
     response = client.put(
         f"/api/v1/properties/{db_property.id}/managers/{manager_id}",
@@ -399,7 +414,6 @@ def test_remove_property_manager(client: TestClient, db: Session):
         address="测试地址",
         contact_name="测试联系人",
         contact_phone="13800001111",
-        community_name="测试小区"
     )
     db_property = property.create_with_manager(db, obj_in=property_in, manager_id=primary_manager.id)
     
@@ -444,6 +458,9 @@ def test_create_transport(client: TestClient, db: Session):
         "vehicle_capacity": 10.0,
         "vehicle_volume": 20.0
     }
+
+
+    
     headers = {"Authorization": f"Bearer {token}"}
     response = client.post("/api/v1/transports/", json=transport_data, headers=headers)
     assert response.status_code == 201

@@ -1,6 +1,5 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
 
 from app.crud.base import CRUDBase
 from app.models.community import Community
@@ -26,45 +25,19 @@ class CRUDCommunity(CRUDBase[Community, CommunityCreate, CommunityUpdate]):
         self, db: Session, *, property_id: int, skip: int = 0, limit: int = 100
     ) -> List[Community]:
         """获取指定物业下的所有社区"""
-        return (
-            db.query(self.model)
-            .filter(Community.property_id == property_id)
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
+        return db.query(Community).filter(Community.property_id == property_id).offset(skip).limit(limit).all()
     
-    def get_active_by_property(
-        self, db: Session, *, property_id: int, skip: int = 0, limit: int = 100
+    def get_active_communities(
+        self, db: Session, *, skip: int = 0, limit: int = 100
     ) -> List[Community]:
-        """获取指定物业下的所有激活状态的社区"""
-        return (
-            db.query(self.model)
-            .filter(
-                and_(
-                    Community.property_id == property_id,
-                    Community.is_active == True
-                )
-            )
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
+        """获取所有激活的社区"""
+        return db.query(Community).filter(Community.is_active == True).offset(skip).limit(limit).all()
     
     def get_by_name(
-        self, db: Session, *, name: str, property_id: int
+        self, db: Session, *, name: str
     ) -> Optional[Community]:
-        """根据名称和物业ID获取社区"""
-        return (
-            db.query(self.model)
-            .filter(
-                and_(
-                    Community.name == name,
-                    Community.property_id == property_id
-                )
-            )
-            .first()
-        )
+        """根据名称获取社区"""
+        return db.query(Community).filter(Community.name == name).first()
     
     def update_status(
         self, db: Session, *, db_obj: Community, is_active: bool
