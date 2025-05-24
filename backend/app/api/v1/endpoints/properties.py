@@ -7,6 +7,7 @@ from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.models.property import Property
 from app.schemas.property import PropertyCreate, PropertyUpdate, PropertyResponse
+from app.schemas.property_manager import PropertyManagerCreate, PropertyManagerUpdate, PropertyManagerResponse
 from app.crud.crud_property import property as crud_property
 
 router = APIRouter()
@@ -75,7 +76,12 @@ async def read_property(
     
     # 检查权限
     if not current_user.is_superuser and current_user.role == UserRole.PROPERTY:
-        if property_obj.manager_id != current_user.id:
+        # 检查用户是否是物业的管理员
+        is_manager = any(
+            manager.manager_id == current_user.id
+            for manager in property_obj.property_managers
+        )
+        if not is_manager:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="没有足够的权限查看此物业信息"
@@ -107,7 +113,12 @@ async def update_property(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="只有物业管理员或管理员可以更新物业信息"
             )
-        if property_obj.manager_id != current_user.id:
+        # 检查用户是否是物业的管理员
+        is_manager = any(
+            manager.manager_id == current_user.id
+            for manager in property_obj.property_managers
+        )
+        if not is_manager:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="只能更新自己管理的物业信息"
@@ -141,3 +152,179 @@ async def delete_property(
     
     property_obj = crud_property.remove(db, id=property_id)
     return property_obj
+
+# 获取物业的物业管理员列表
+@router.get("/{property_id}/managers", response_model=List[PropertyManagerResponse])
+async def read_property_managers(
+    *,
+    db: Session = Depends(get_db),
+    property_id: int,
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """获取物业的物业管理员列表"""
+    # 检查物业是否存在
+    property_obj = crud_property.get(db, id=property_id)
+    if not property_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="物业信息不存在"
+        )
+    
+    # 检查权限
+    if not current_user.is_superuser:
+        if current_user.role != UserRole.PROPERTY:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="只有物业管理员或管理员可以查看物业管理员列表"
+            )
+        # 检查当前用户是否是物业的管理员
+        is_manager = any(
+            manager.manager_id == current_user.id
+            for manager in property_obj.property_managers
+        )
+        if not is_manager:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="没有足够的权限查看此物业的物业管理员列表"
+            )
+    
+    return property_obj.property_managers
+
+
+# 添加物业管理员
+@router.post("/{property_id}/managers", response_model=PropertyManagerResponse)
+async def add_property_manager(
+    *,
+    db: Session = Depends(get_db),
+    property_id: int,
+    manager_in: PropertyManagerCreate,
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """添加物业管理员"""
+    # 检查物业是否存在
+    property_obj = crud_property.get(db, id=property_id)
+    if not property_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="物业信息不存在"
+        )
+    
+    # 检查权限
+    if not current_user.is_superuser:
+        if current_user.role != UserRole.PROPERTY:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="只有物业管理员或管理员可以添加管理员"
+            )
+        # 检查当前用户是否是该物业的主要管理员
+        is_primary_manager = any(
+            manager.manager_id == current_user.id and manager.is_primary
+            for manager in property_obj.property_managers
+        )
+        if not is_primary_manager:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="只有主要管理员可以添加其他管理员"
+            )
+    
+    try:
+        manager = crud_property.add_manager(db, property_id=property_id, obj_in=manager_in)
+        return manager
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+# 更新物业管理员
+@router.put("/{property_id}/managers/{manager_id}", response_model=PropertyManagerResponse)
+async def update_property_manager(
+    *,
+    db: Session = Depends(get_db),
+    property_id: int,
+    manager_id: int,
+    manager_in: PropertyManagerUpdate,
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """更新物业管理员信息"""
+    # 检查物业是否存在
+    property_obj = crud_property.get(db, id=property_id)
+    if not property_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="物业信息不存在"
+        )
+    
+    # 检查权限
+    if not current_user.is_superuser:
+        if current_user.role != UserRole.PROPERTY:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="只有物业管理员或管理员可以更新管理员信息"
+            )
+        # 检查当前用户是否是物业的主要管理员
+        is_primary_manager = any(
+            manager.manager_id == current_user.id and manager.is_primary
+            for manager in property_obj.property_managers
+        )
+        if not is_primary_manager:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="只有主要管理员可以更新管理员信息"
+            )
+    
+    try:
+        manager = crud_property.update_manager(
+            db, manager_id=manager_id, obj_in=manager_in
+        )
+        return manager
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+# 移除物业管理员
+@router.delete("/{property_id}/managers/{manager_id}", response_model=PropertyManagerResponse)
+async def remove_property_manager(
+    *,
+    db: Session = Depends(get_db),
+    property_id: int,
+    manager_id: int,
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """移除物业管理员"""
+    # 检查物业是否存在
+    property_obj = crud_property.get(db, id=property_id)
+    if not property_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="物业信息不存在"
+        )
+    
+    # 检查权限
+    if not current_user.is_superuser:
+        if current_user.role != UserRole.PROPERTY:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="只有物业管理员或管理员可以移除管理员"
+            )
+        # 检查当前用户是否是物业的主要管理员
+        is_primary_manager = any(
+            manager.manager_id == current_user.id and manager.is_primary
+            for manager in property_obj.property_managers
+        )
+        if not is_primary_manager:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="只有主要管理员可以移除其他管理员"
+            )
+    
+    try:
+        manager = crud_property.remove_manager(db, manager_id=manager_id)
+        return manager
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )

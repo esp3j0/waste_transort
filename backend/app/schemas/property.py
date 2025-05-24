@@ -1,46 +1,45 @@
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from app.schemas.community import CommunityResponse
+from app.schemas.property_manager import PropertyManagerResponse
 
 # 共享属性
 class PropertyBase(BaseModel):
-    name: str
-    address: str
-    contact_name: str
-    contact_phone: str
-    email: Optional[str] = None
-    community_name: str
-    building_count: Optional[int] = 0
-    area: Optional[int] = 0
-    household_count: Optional[int] = 0
-    description: Optional[str] = None
+    """物业基础模型"""
+    name: str = Field(..., description="物业公司名称")
+    address: str = Field(..., description="物业公司地址")
+    contact_name: str = Field(..., description="联系人姓名")
+    contact_phone: str = Field(..., description="联系电话")
+    email: Optional[str] = Field(None, description="电子邮箱")
+    description: Optional[str] = Field(None, description="描述信息")
 
 # 创建时需要的属性
 class PropertyCreate(PropertyBase):
+    """创建物业模型"""
     pass
 
 # 更新时可以修改的属性
 class PropertyUpdate(BaseModel):
-    name: Optional[str] = None
-    address: Optional[str] = None
-    contact_name: Optional[str] = None
-    contact_phone: Optional[str] = None
-    email: Optional[str] = None
-    community_name: Optional[str] = None
-    building_count: Optional[int] = None
-    area: Optional[int] = None
-    household_count: Optional[int] = None
-    description: Optional[str] = None
-    is_active: Optional[bool] = None
-    manager_id: Optional[int] = None
+    """更新物业模型"""
+    name: Optional[str] = Field(None, description="物业公司名称")
+    address: Optional[str] = Field(None, description="物业公司地址")
+    contact_name: Optional[str] = Field(None, description="联系人姓名")
+    contact_phone: Optional[str] = Field(None, description="联系电话")
+    email: Optional[str] = Field(None, description="电子邮箱")
+    description: Optional[str] = Field(None, description="描述信息")
+    is_active: Optional[bool] = Field(None, description="是否激活")
 
 # API响应模型
 class PropertyResponse(PropertyBase):
-    id: int
-    manager_id: Optional[int] = None
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
+    """物业响应模型"""
+    id: int = Field(..., description="物业ID")
+    is_active: bool = Field(..., description="是否激活")
+    created_at: datetime = Field(..., description="创建时间")
+    updated_at: datetime = Field(..., description="更新时间")
+    property_managers: List[PropertyManagerResponse] = Field(default_factory=list, description="物业管理员列表")
+    communities: List[CommunityResponse] = Field(default_factory=list, description="管理的社区列表")
     
     class Config:
-        orm_mode = True
+        from_attributes = True

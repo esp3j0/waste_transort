@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import properties, users, auth, orders, transports, recyclings
+from app.api.v1.endpoints import properties, users, auth, orders, transports, recyclings, communities
 
 api_router = APIRouter()
 
@@ -11,3 +11,4 @@ api_router.include_router(orders.router, prefix="/orders", tags=["orders"])
 api_router.include_router(properties.router, prefix="/properties", tags=["properties"])
 api_router.include_router(transports.router, prefix="/transports", tags=["transports"])
 api_router.include_router(recyclings.router, prefix="/recyclings", tags=["recyclings"])
+api_router.include_router(communities.router, prefix="/communities", tags=["communities"])
