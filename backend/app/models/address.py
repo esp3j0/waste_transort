@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 
 from app.db.base_class import Base
+from app.models.community import Community # 导入 Community 模型
 
 class Address(Base):
     """地址模型"""
@@ -11,12 +12,15 @@ class Address(Base):
     user = relationship("User", back_populates="addresses")  # 用户关系
     
     # 地址信息
-    address = Column(String)  # 详细地址
-    community_name = Column(String)  # 小区名称
+    address = Column(String)  # 详细地址 (例如：xx路xx号)
+    community_id = Column(Integer, ForeignKey("community.id"), nullable=False) # 新增：关联小区ID
     building_number = Column(String)  # 楼栋号
     room_number = Column(String)  # 房间号
     contact_name = Column(String)  # 联系人姓名
     contact_phone = Column(String)  # 联系电话
+    
+    # 关联的小区对象
+    community = relationship("Community") # 新增：与Community模型的关系
     
     # 地址标签
     label = Column(String, nullable=True)  # 地址标签（如：家、公司等）
