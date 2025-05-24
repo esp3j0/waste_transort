@@ -6,7 +6,6 @@ from app.crud.base import CRUDBase
 from app.models.property import Property
 from app.models.property_manager import PropertyManager
 from app.schemas.property import PropertyCreate, PropertyUpdate
-from app.schemas.property_manager import PropertyManagerCreate, PropertyManagerUpdate
 
 class CRUDProperty(CRUDBase[Property, PropertyCreate, PropertyUpdate]):
     """物业CRUD操作"""
@@ -29,85 +28,6 @@ class CRUDProperty(CRUDBase[Property, PropertyCreate, PropertyUpdate]):
         db.add(manager)
         db.commit()
         db.refresh(db_obj)
-        return db_obj
-    
-    def add_manager(
-        self, db: Session, *, property_id: int, obj_in: PropertyManagerCreate
-    ) -> PropertyManager:
-        """添加物业管理员"""
-        # 检查是否已存在主要管理员
-        if obj_in.is_primary:
-            existing_primary = (
-                db.query(PropertyManager)
-                .filter(
-                    and_(
-                        PropertyManager.property_id == property_id,
-                        PropertyManager.is_primary == True
-                    )
-                )
-                .first()
-            )
-            if existing_primary:
-                raise ValueError("已存在主要管理员")
-        
-        # 创建管理员关联
-        db_obj = PropertyManager(
-            property_id=property_id,
-            manager_id=obj_in.manager_id,
-            role=obj_in.role,
-            is_primary=obj_in.is_primary
-        )
-        db.add(db_obj)
-        db.commit()
-        db.refresh(db_obj)
-        return db_obj
-    
-    def update_manager(
-        self, db: Session, *, manager_id: int, obj_in: PropertyManagerUpdate
-    ) -> PropertyManager:
-        """更新物业管理员信息"""
-        db_obj = db.query(PropertyManager).filter(PropertyManager.id == manager_id).first()
-        if not db_obj:
-            raise ValueError("管理员不存在")
-        # 如果要设置为主要管理员，检查当前物业是否已存在
-        if obj_in.is_primary and not db_obj.is_primary:
-            existing_primary = (
-                db.query(PropertyManager)
-                .filter(
-                    and_(
-                        PropertyManager.property_id == db_obj.property_id,
-                        PropertyManager.is_primary == True
-                    )
-                )
-                .first()
-            )
-            if existing_primary:
-                raise ValueError("已存在主要管理员")
-        
-        # 更新管理员信息
-        update_data = obj_in.model_dump(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(db_obj, field, value)
-        
-        db.add(db_obj)
-        db.commit()
-        db.refresh(db_obj)
-        return db_obj
-    
-    def remove_manager(self, db: Session, *, manager_id: int) -> PropertyManager:
-        """移除物业管理员"""
-        db_obj = db.query(PropertyManager).filter(PropertyManager.id == manager_id).first()
-        if not db_obj:
-            raise ValueError("管理员不存在")
-        
-        # 不允许删除主要管理员
-        if db_obj.is_primary:
-            raise ValueError("不能删除主要管理员")
-        
-        # 在删除前，对象db_obj仍然包含数据
-        # FastAPI将使用这个对象来构造PropertyManagerResponse
-        db.delete(db_obj)
-        db.commit()
         return db_obj
     
     def get_by_manager(

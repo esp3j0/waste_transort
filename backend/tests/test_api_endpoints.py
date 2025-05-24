@@ -331,23 +331,28 @@ def test_delete_property(client: TestClient, db: Session):
 # 测试添加物业管理员
 def test_add_property_manager(client: TestClient, db: Session):
     # 创建主要管理员和物业
-    primary_manager, primary_token = create_user_with_role(db, UserRole.PROPERTY)
+    primary_manager_user, primary_token = create_user_with_role(db, UserRole.PROPERTY)
     property_in = PropertyCreate(
-        name="测试物业",
-        address="测试地址",
+        name="测试物业_add_pm",
+        address="测试地址_add_pm",
         contact_name="测试联系人",
-        contact_phone="13800001111"
+        contact_phone="13800001112"
     )
-    db_property = property.create_with_manager(db, obj_in=property_in, manager_id=primary_manager.id)
+    db_property = property.create_with_manager(db, obj_in=property_in, manager_id=primary_manager_user.id)
     
-    # 创建新的管理员用户
-    new_manager, _ = create_user_with_role(db, UserRole.PROPERTY)
+    # 创建一个小区用于关联
+    community_in = CommunityCreate(name="测试小区_add_pm", address="测试小区地址_add_pm")
+    db_community = community.create_with_property(db, obj_in=community_in, property_id=db_property.id)
+
+    # 创建新的普通管理员用户
+    new_ordinary_manager_user, _ = create_user_with_role(db, UserRole.PROPERTY, is_superuser=False)
     
-    # 测试添加管理员
+    # 测试添加普通管理员，关联小区
     manager_data = {
-        "manager_id": new_manager.id,
+        "manager_id": new_ordinary_manager_user.id,
         "role": "普通管理员",
-        "is_primary": False
+        "is_primary": False,
+        "community_id": db_community.id  # 添加 community_id
     }
     headers = {"Authorization": f"Bearer {primary_token}"}
     response = client.post(
@@ -355,92 +360,105 @@ def test_add_property_manager(client: TestClient, db: Session):
         json=manager_data,
         headers=headers
     )
-    assert response.status_code == 200
+    assert response.status_code == 200, response.json()
     data = response.json()
-    assert data["manager_id"] == new_manager.id
+    assert data["manager_id"] == new_ordinary_manager_user.id
     assert data["role"] == "普通管理员"
     assert not data["is_primary"]
+    assert data["community_id"] == db_community.id
+    assert data["community"] is not None
+    assert data["community"]["id"] == db_community.id
 
 # 测试更新物业管理员
 def test_update_property_manager(client: TestClient, db: Session):
     # 创建主要管理员和物业
-    primary_manager, primary_token = create_user_with_role(db, UserRole.PROPERTY)
+    primary_manager_user, primary_token = create_user_with_role(db, UserRole.PROPERTY)
     property_in = PropertyCreate(
-        name="测试物业",
-        address="测试地址",
+        name="测试物业_upd_pm",
+        address="测试地址_upd_pm",
         contact_name="测试联系人",
-        contact_phone="13800001111",
+        contact_phone="13800001113",
     )
-    db_property = property.create_with_manager(db, obj_in=property_in, manager_id=primary_manager.id)
+    db_property = property.create_with_manager(db, obj_in=property_in, manager_id=primary_manager_user.id)
     
-    # 创建新的管理员用户
-    new_manager, _ = create_user_with_role(db, UserRole.PROPERTY)
+    # 创建一个小区用于关联
+    db_community1 = community.create_with_property(db, obj_in=CommunityCreate(name="小区1_upd_pm", address="地址1"), property_id=db_property.id)
+    db_community2 = community.create_with_property(db, obj_in=CommunityCreate(name="小区2_upd_pm", address="地址2"), property_id=db_property.id)
+
+    # 创建新的普通管理员用户并添加
+    new_ordinary_manager_user, _ = create_user_with_role(db, UserRole.PROPERTY)
     
-    # 添加新管理员
-    manager_data = {
-        "manager_id": new_manager.id,
+    add_manager_data = {
+        "manager_id": new_ordinary_manager_user.id,
         "role": "普通管理员",
-        "is_primary": False
+        "is_primary": False,
+        "community_id": db_community1.id # 初始关联小区1
     }
     headers = {"Authorization": f"Bearer {primary_token}"}
-    response = client.post(
+    add_response = client.post(
         f"/api/v1/properties/{db_property.id}/managers",
-        json=manager_data,
+        json=add_manager_data,
         headers=headers
     )
-    assert response.status_code == 200
-    manager_id = response.json()["id"]
+    assert add_response.status_code == 200, add_response.json()
+    pm_id_to_update = add_response.json()["id"] # PropertyManager ID
     
-    # 测试更新管理员信息
+    # 测试更新管理员信息，更改角色和关联小区
     update_data = {
-        "role": "高级管理员",
-        "is_primary": False,
+        "role": "高级小区管理员",
+        "is_primary": False, # 保持非主要
+        "community_id": db_community2.id # 更新到小区2
     }
-    response = client.put(
-        f"/api/v1/properties/{db_property.id}/managers/{manager_id}",
+    update_response = client.put(
+        f"/api/v1/properties/{db_property.id}/managers/{pm_id_to_update}", # 使用 pm_id
         json=update_data,
         headers=headers
     )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["role"] == "高级管理员"
+    assert update_response.status_code == 200, update_response.json()
+    data = update_response.json()
+    assert data["role"] == "高级小区管理员"
+    assert data["community_id"] == db_community2.id
+    assert data["community"]["id"] == db_community2.id
 
 # 测试移除物业管理员
 def test_remove_property_manager(client: TestClient, db: Session):
     # 创建主要管理员和物业
-    primary_manager, primary_token = create_user_with_role(db, UserRole.PROPERTY)
+    primary_manager_user, primary_token = create_user_with_role(db, UserRole.PROPERTY)
     property_in = PropertyCreate(
-        name="测试物业",
-        address="测试地址",
+        name="测试物业_rem_pm",
+        address="测试地址_rem_pm",
         contact_name="测试联系人",
-        contact_phone="13800001111",
+        contact_phone="13800001114",
     )
-    db_property = property.create_with_manager(db, obj_in=property_in, manager_id=primary_manager.id)
+    db_property = property.create_with_manager(db, obj_in=property_in, manager_id=primary_manager_user.id)
+
+    # 创建一个小区用于关联
+    db_community = community.create_with_property(db, obj_in=CommunityCreate(name="小区_rem_pm", address="地址_rem_pm"), property_id=db_property.id)
     
-    # 创建新的管理员用户
-    new_manager, _ = create_user_with_role(db, UserRole.PROPERTY)
+    # 创建新的普通管理员用户并添加
+    new_ordinary_manager_user, _ = create_user_with_role(db, UserRole.PROPERTY)
     
-    # 添加新管理员
-    manager_data = {
-        "manager_id": new_manager.id,
-        "role": "普通管理员",
-        "is_primary": False
+    add_manager_data = {
+        "manager_id": new_ordinary_manager_user.id,
+        "role": "待移除管理员",
+        "is_primary": False,
+        "community_id": db_community.id # 关联小区
     }
     headers = {"Authorization": f"Bearer {primary_token}"}
-    response = client.post(
+    add_response = client.post(
         f"/api/v1/properties/{db_property.id}/managers",
-        json=manager_data,
+        json=add_manager_data,
         headers=headers
     )
-    assert response.status_code == 200
-    manager_id = response.json()["id"]
+    assert add_response.status_code == 200, add_response.json()
+    pm_id_to_remove = add_response.json()["id"] # PropertyManager ID
     
     # 测试移除管理员
-    response = client.delete(
-        f"/api/v1/properties/{db_property.id}/managers/{manager_id}",
+    remove_response = client.delete(
+        f"/api/v1/properties/{db_property.id}/managers/{pm_id_to_remove}", # 使用 pm_id
         headers=headers
     )
-    assert response.status_code == 200
+    assert remove_response.status_code == 200, remove_response.json()
 
 # ============ 运输API测试 ============
 

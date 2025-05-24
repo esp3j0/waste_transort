@@ -11,6 +11,7 @@ class PropertyManager(Base):
     manager_id = Column(Integer, ForeignKey("user.id"), nullable=False)
     role = Column(String, nullable=False)  # 管理员角色，如：主管理员、普通管理员等
     is_primary = Column(Boolean, default=False)  # 是否为主要管理员
+    community_id = Column(Integer, ForeignKey("community.id"), nullable=True) # 关联的小区ID，对于非主要管理员
     
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -18,4 +19,8 @@ class PropertyManager(Base):
     
     # 关系
     property = relationship("Property", back_populates="property_managers")
-    manager = relationship("User", back_populates="managed_properties") 
+    manager = relationship("User", back_populates="managed_properties")
+    community = relationship("Community") # 关联的小区对象
+
+    def __repr__(self):
+        return f"<PropertyManager(id={self.id}, property_id={self.property_id}, manager_id={self.manager_id}, role={self.role}, is_primary={self.is_primary})>" 

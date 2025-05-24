@@ -1,11 +1,13 @@
 import pytest
 from sqlalchemy.orm import Session
 
-from app.crud import user, property, order, transport, recycling, address, community
+from app.crud import user, property as crud_property, order, transport, recycling, address, community as crud_community
+from app.crud.crud_property_manager import property_manager as crud_prop_manager
 from app.models.user import User, UserRole
 from app.models.order import Order, OrderStatus
 from app.models.transport import Transport, DriverStatus
 from app.models.recycling import Recycling, RecyclingStatus
+from app.models.property_manager import PropertyManager
 from app.schemas.user import UserCreate
 from app.schemas.order import OrderCreate
 from app.schemas.transport import TransportCreate
@@ -126,192 +128,176 @@ def test_create_recycling(db: Session):
 def test_create_property(db: Session):
     # 创建测试用户
     user_in = UserCreate(
-        username="testproperty",
-        email="testproperty@example.com",
-        phone="13800001111",
+        username="testproperty_crud",
+        email="testproperty_crud@example.com",
+        phone="13800001118",
         password="testpassword",
-        full_name="测试物业用户",
+        full_name="测试物业用户CRUD",
         role=UserRole.PROPERTY
     )
     db_user = user.create(db, obj_in=user_in)
     
     # 创建测试物业
     property_in = PropertyCreate(
-        name="测试物业",
-        address="测试地址",
-        contact_name="测试联系人",
-        contact_phone="13800001111"
+        name="测试物业CRUD",
+        address="测试地址CRUD",
+        contact_name="测试联系人CRUD",
+        contact_phone="13800001119"
     )
-    db_property = property.create_with_manager(db, obj_in=property_in, manager_id=db_user.id)
-    assert db_property.name == "测试物业"
+    db_property = crud_property.create_with_manager(db, obj_in=property_in, manager_id=db_user.id)
+    assert db_property.name == "测试物业CRUD"
     assert len(db_property.property_managers) == 1
-    assert db_property.property_managers[0].manager_id == db_user.id
-    assert db_property.property_managers[0].is_primary == True
+    pm_entry = db.query(PropertyManager).filter(PropertyManager.property_id == db_property.id, PropertyManager.manager_id == db_user.id).first()
+    assert pm_entry is not None
+    assert pm_entry.manager_id == db_user.id
+    assert pm_entry.is_primary == True
+    assert pm_entry.community_id is None
     
     # 创建社区
     community_in = CommunityCreate(
-        name="测试小区",
-        address="测试小区地址"
+        name="测试小区CRUD",
+        address="测试小区地址CRUD"
     )
-    db_community = community.create_with_property(db, obj_in=community_in, property_id=db_property.id)
-    assert db_community.name == "测试小区"
+    db_community = crud_community.create_with_property(db, obj_in=community_in, property_id=db_property.id)
+    assert db_community.name == "测试小区CRUD"
     assert db_community.property_id == db_property.id
 
 # 测试添加物业管理员
 def test_add_property_manager(db: Session):
-    # 创建主要管理员和物业
-    primary_manager_in = UserCreate(
-        username="primarymanager",
-        email="primary@example.com",
-        phone="13800001111",
+    # 创建主要管理员用户
+    primary_manager_user_in = UserCreate(
+        username="primarymanager_crud_add",
+        email="primary_crud_add@example.com",
+        phone="13800001120",
         password="testpassword",
-        full_name="主要管理员",
+        full_name="主要管理员CRUD_ADD",
         role=UserRole.PROPERTY
     )
-    db_primary_manager = user.create(db, obj_in=primary_manager_in)
+    db_primary_manager = user.create(db, obj_in=primary_manager_user_in)
     
     property_in = PropertyCreate(
-        name="测试物业",
-        address="测试地址",
+        name="测试物业_CRUD_ADD_PM",
+        address="测试地址_CRUD_ADD_PM",
         contact_name="测试联系人",
-        contact_phone="13800001111"
+        contact_phone="13800001121"
     )
-    db_property = property.create_with_manager(db, obj_in=property_in, manager_id=db_primary_manager.id)
+    db_property = crud_property.create_with_manager(db, obj_in=property_in, manager_id=db_primary_manager.id)
     
     # 创建社区
-    community_in = CommunityCreate(
-        name="测试小区",
-        address="测试小区地址"
+    community_in_obj = CommunityCreate(
+        name="测试小区_CRUD_ADD_PM",
+        address="测试小区地址_CRUD_ADD_PM"
     )
-    community.create_with_property(db, obj_in=community_in, property_id=db_property.id)
+    db_community = crud_community.create_with_property(db, obj_in=community_in_obj, property_id=db_property.id)
     
-    # 创建新的管理员用户
-    new_manager_in = UserCreate(
-        username="newmanager",
-        email="new@example.com",
-        phone="13800002222",
+    # 创建新的普通管理员用户
+    new_manager_user_in = UserCreate(
+        username="newmanager_crud_add",
+        email="new_crud_add@example.com",
+        phone="13800002223",
         password="testpassword",
-        full_name="新管理员",
+        full_name="新管理员CRUD_ADD",
         role=UserRole.PROPERTY
     )
-    db_new_manager = user.create(db, obj_in=new_manager_in)
+    db_new_manager = user.create(db, obj_in=new_manager_user_in)
     
     # 添加新管理员
-    manager_data = PropertyManagerCreate(
+    manager_create_schema = PropertyManagerCreate(
         manager_id=db_new_manager.id,
         role="普通管理员",
-        is_primary=False
+        is_primary=False,
+        community_id=db_community.id
     )
-    db_manager = property.add_manager(db, property_id=db_property.id, obj_in=manager_data)
-    assert db_manager.manager_id == db_new_manager.id
-    assert db_manager.role == "普通管理员"
-    assert not db_manager.is_primary
-    assert len(db_property.property_managers) == 2
+    db_added_manager = crud_prop_manager.create(db, obj_in=manager_create_schema, property_id=db_property.id)
+    
+    assert db_added_manager.manager_id == db_new_manager.id
+    assert db_added_manager.role == "普通管理员"
+    assert not db_added_manager.is_primary
+    assert db_added_manager.community_id == db_community.id
+    
+    # Verify count
+    managers_count = db.query(PropertyManager).filter(PropertyManager.property_id == db_property.id).count()
+    assert managers_count == 2
 
 # 测试更新物业管理员
 def test_update_property_manager(db: Session):
-    # 创建主要管理员和物业
-    primary_manager_in = UserCreate(
-        username="primarymanager",
-        email="primary@example.com",
-        phone="13800001111",
-        password="testpassword",
-        full_name="主要管理员",
-        role=UserRole.PROPERTY
-    )
-    db_primary_manager = user.create(db, obj_in=primary_manager_in)
+    primary_manager_user_in = UserCreate(
+        username="primarymanager_crud_upd", email="primary_crud_upd@example.com", phone="13800001122",
+        password="testpassword", full_name="主要管理员CRUD_UPD", role=UserRole.PROPERTY)
+    db_primary_manager = user.create(db, obj_in=primary_manager_user_in)
     
     property_in = PropertyCreate(
-        name="测试物业",
-        address="测试地址",
-        contact_name="测试联系人",
-        contact_phone="13800001111"
-    )
-    db_property = property.create_with_manager(db, obj_in=property_in, manager_id=db_primary_manager.id)
+        name="测试物业_CRUD_UPD_PM", address="测试地址_CRUD_UPD_PM",
+        contact_name="测试联系人", contact_phone="13800001123")
+    db_property = crud_property.create_with_manager(db, obj_in=property_in, manager_id=db_primary_manager.id)
     
-    # 创建社区
-    community_in = CommunityCreate(
-        name="测试小区",
-        address="测试小区地址"
-    )
-    community.create_with_property(db, obj_in=community_in, property_id=db_property.id)
+    community1_in = CommunityCreate(name="小区1_CRUD_UPD", address="地址1")
+    db_community1 = crud_community.create_with_property(db, obj_in=community1_in, property_id=db_property.id)
+    community2_in = CommunityCreate(name="小区2_CRUD_UPD", address="地址2")
+    db_community2 = crud_community.create_with_property(db, obj_in=community2_in, property_id=db_property.id)
+
+    new_manager_user_in = UserCreate(
+        username="newmanager_crud_upd", email="new_crud_upd@example.com", phone="13800002224",
+        password="testpassword", full_name="新管理员CRUD_UPD", role=UserRole.PROPERTY)
+    db_new_manager = user.create(db, obj_in=new_manager_user_in)
     
-    # 创建新的管理员用户
-    new_manager_in = UserCreate(
-        username="newmanager",
-        email="new@example.com",
-        phone="13800002222",
-        password="testpassword",
-        full_name="新管理员",
-        role=UserRole.PROPERTY
-    )
-    db_new_manager = user.create(db, obj_in=new_manager_in)
+    manager_create_schema = PropertyManagerCreate(
+        manager_id=db_new_manager.id, role="普通管理员", is_primary=False, community_id=db_community1.id)
+    db_manager_to_update = crud_prop_manager.create(db, obj_in=manager_create_schema, property_id=db_property.id)
     
-    # 添加新管理员
-    manager_data = PropertyManagerCreate(
-        manager_id=db_new_manager.id,
-        role="普通管理员",
-        is_primary=False
-    )
-    db_manager = property.add_manager(db, property_id=db_property.id, obj_in=manager_data)
+    update_schema = PropertyManagerUpdate(role="高级管理员", community_id=db_community2.id)
     
-    # 更新管理员信息
-    update_data = PropertyManagerUpdate(
-        role="高级管理员",
-        is_primary=False
-    )
-    updated_manager = property.update_manager(db, manager_id=db_manager.id, obj_in=update_data)
+    updated_manager = crud_prop_manager.update(db, db_obj=db_manager_to_update, obj_in=update_schema)
     assert updated_manager.role == "高级管理员"
     assert not updated_manager.is_primary
+    assert updated_manager.community_id == db_community2.id
+
+    # Test promoting to primary (and ensuring community_id becomes None)
+    update_to_primary_schema = PropertyManagerUpdate(is_primary=True)
+    # First, demote the original primary manager to allow promotion of another one
+    original_primary_pm = db.query(PropertyManager).filter(PropertyManager.property_id == db_property.id, PropertyManager.is_primary == True).first()
+    assert original_primary_pm is not None
+    crud_prop_manager.update(db, db_obj=original_primary_pm, obj_in=PropertyManagerUpdate(is_primary=False, community_id=db_community1.id))
+
+    promoted_manager = crud_prop_manager.update(db, db_obj=db_manager_to_update, obj_in=update_to_primary_schema)
+    assert promoted_manager.is_primary is True
+    assert promoted_manager.community_id is None
 
 # 测试移除物业管理员
 def test_remove_property_manager(db: Session):
-    # 创建主要管理员和物业
-    primary_manager_in = UserCreate(
-        username="primarymanager",
-        email="primary@example.com",
-        phone="13800001111",
-        password="testpassword",
-        full_name="主要管理员",
-        role=UserRole.PROPERTY
-    )
-    db_primary_manager = user.create(db, obj_in=primary_manager_in)
+    primary_manager_user_in = UserCreate(
+        username="primarymanager_crud_rem", email="primary_crud_rem@example.com", phone="13800001124",
+        password="testpassword", full_name="主要管理员CRUD_REM", role=UserRole.PROPERTY)
+    db_primary_manager = user.create(db, obj_in=primary_manager_user_in)
     
     property_in = PropertyCreate(
-        name="测试物业",
-        address="测试地址",
-        contact_name="测试联系人",
-        contact_phone="13800001111"
-    )
-    db_property = property.create_with_manager(db, obj_in=property_in, manager_id=db_primary_manager.id)
+        name="测试物业_CRUD_REM_PM", address="测试地址_CRUD_REM_PM",
+        contact_name="测试联系人", contact_phone="13800001125")
+    db_property = crud_property.create_with_manager(db, obj_in=property_in, manager_id=db_primary_manager.id)
     
-    # 创建社区
-    community_in = CommunityCreate(
-        name="测试小区",
-        address="测试小区地址"
-    )
-    community.create_with_property(db, obj_in=community_in, property_id=db_property.id)
+    community_in_obj = CommunityCreate(name="测试小区_CRUD_REM_PM", address="测试小区地址_CRUD_REM_PM")
+    db_community = crud_community.create_with_property(db, obj_in=community_in_obj, property_id=db_property.id)
     
-    # 创建新的管理员用户
-    new_manager_in = UserCreate(
-        username="newmanager",
-        email="new@example.com",
-        phone="13800002222",
-        password="testpassword",
-        full_name="新管理员",
-        role=UserRole.PROPERTY
-    )
-    db_new_manager = user.create(db, obj_in=new_manager_in)
+    new_manager_user_in = UserCreate(
+        username="newmanager_crud_rem", email="new_crud_rem@example.com", phone="13800002225",
+        password="testpassword", full_name="新管理员CRUD_REM", role=UserRole.PROPERTY)
+    db_new_manager = user.create(db, obj_in=new_manager_user_in)
     
-    # 添加新管理员
-    manager_data = PropertyManagerCreate(
-        manager_id=db_new_manager.id,
-        role="普通管理员",
-        is_primary=False
-    )
-    db_manager = property.add_manager(db, property_id=db_property.id, obj_in=manager_data)
+    manager_create_schema = PropertyManagerCreate(
+        manager_id=db_new_manager.id, role="待移除管理员", is_primary=False, community_id=db_community.id)
+    db_manager_to_remove = crud_prop_manager.create(db, obj_in=manager_create_schema, property_id=db_property.id)
     
-    # 移除管理员
-    property.remove_manager(db, manager_id=db_manager.id)
-    assert len(db_property.property_managers) == 1
-    assert db_property.property_managers[0].manager_id == db_primary_manager.id
+    initial_pm_count = db.query(PropertyManager).filter(PropertyManager.property_id == db_property.id).count()
+    assert initial_pm_count == 2
+
+    removed_manager = crud_prop_manager.remove(db, id=db_manager_to_remove.id)
+    assert removed_manager.id == db_manager_to_remove.id
+    
+    final_pm_count = db.query(PropertyManager).filter(PropertyManager.property_id == db_property.id).count()
+    assert final_pm_count == initial_pm_count - 1
+    
+    # Ensure the correct one was removed
+    remaining_manager = db.query(PropertyManager).filter(PropertyManager.property_id == db_property.id).first()
+    assert remaining_manager is not None
+    assert remaining_manager.manager_id == db_primary_manager.id
+    assert remaining_manager.is_primary is True
