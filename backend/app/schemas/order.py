@@ -1,8 +1,13 @@
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from enum import Enum
 from .address import AddressResponse
+from .transport_company import TransportCompanyResponse
+from .transport_manager import TransportManagerResponse
+from .vehicle import VehicleResponse
+from .waste_record import WasteRecordResponse
+from .payment import PaymentResponse
 
 # 订单状态枚举
 class OrderStatus(str, Enum):
@@ -36,14 +41,10 @@ class OrderStatusUpdate(BaseModel):
     property_notes: Optional[str] = None
     transport_notes: Optional[str] = None
     recycling_notes: Optional[str] = None
-    driver_id: Optional[int] = None
-    vehicle_plate: Optional[str] = None
+    driver_assoc_id: Optional[int] = None
+    vehicle_id: Optional[int] = None
+    transport_company_id: Optional[int] = None
     transport_route: Optional[str] = None
-    recycling_station_id: Optional[int] = None
-    waste_weight: Optional[float] = None
-    actual_pickup_time: Optional[datetime] = None
-    delivery_time: Optional[datetime] = None
-    recycling_confirm_time: Optional[datetime] = None
 
 # 更新时可以修改的属性
 class OrderUpdate(BaseModel):
@@ -55,7 +56,7 @@ class OrderUpdate(BaseModel):
     contact_name: Optional[str] = None
     contact_phone: Optional[str] = None
     
-    # 订单信息
+    # 订单信息，订单中用户填写的废物信息
     waste_type: Optional[str] = None
     waste_volume: Optional[float] = None
     waste_weight: Optional[float] = None
@@ -70,15 +71,16 @@ class OrderUpdate(BaseModel):
     property_notes: Optional[str] = None
     
     # 运输管理信息
+    transport_company_id: Optional[int] = None
     transport_manager_id: Optional[int] = None
-    driver_id: Optional[int] = None
-    vehicle_plate: Optional[str] = None
+    driver_assoc_id: Optional[int] = None
+    vehicle_id: Optional[int] = None
     transport_route: Optional[str] = None
     transport_notes: Optional[str] = None
     
     # 处置回收信息
     recycling_manager_id: Optional[int] = None
-    recycling_station_id: Optional[int] = None
+    recycling_company_id: Optional[int] = None
     recycling_confirm_time: Optional[datetime] = None
     recycling_notes: Optional[str] = None
     
@@ -107,15 +109,16 @@ class OrderResponse(OrderBase):
     property_notes: Optional[str] = None
     
     # 运输管理信息
+    transport_company_id: Optional[int] = None
     transport_manager_id: Optional[int] = None
-    driver_id: Optional[int] = None
-    vehicle_plate: Optional[str] = None
+    driver_assoc_id: Optional[int] = None
+    vehicle_id: Optional[int] = None
     transport_route: Optional[str] = None
     transport_notes: Optional[str] = None
     
     # 处置回收信息
     recycling_manager_id: Optional[int] = None
-    recycling_station_id: Optional[int] = None
+    recycling_company_id: Optional[int] = None
     recycling_confirm_time: Optional[datetime] = None
     recycling_notes: Optional[str] = None
     
@@ -130,7 +133,12 @@ class OrderResponse(OrderBase):
     payment_time: Optional[datetime] = None
     
     # 关系字段
-    address: Optional[AddressResponse] = None  # 添加地址关系
+    address: Optional[AddressResponse] = None
+    transport_company: Optional[TransportCompanyResponse] = None
+    driver_info: Optional[TransportManagerResponse] = None
+    vehicle_info: Optional[VehicleResponse] = None
+    waste_records: Optional[List[WasteRecordResponse]] = Field(None, description="关联的废物记录") # 处置回收信息实际填写的废物信息
+    payments: Optional[List[PaymentResponse]] = Field(None, description="关联的支付记录")
     
     class Config:
-        orm_mode = True
+        from_attributes = True

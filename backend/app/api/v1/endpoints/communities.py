@@ -39,8 +39,8 @@ async def create_community(
         )
     
     # 创建社区
-    community_obj = community.create(db, obj_in=community_in)
-    return community_obj
+    db_community = community.create_with_property_company(db, obj_in=community_in)
+    return CommunityResponse.model_validate(db_community).model_dump()
 
 @router.get("/", response_model=List[CommunityResponse])
 async def read_communities(
@@ -60,7 +60,9 @@ async def read_communities(
     else:
         # 管理员可以看到所有社区
         communities = community.get_multi(db, skip=skip, limit=limit)
-    return communities
+    return [
+        CommunityResponse.model_validate(community).model_dump() for community in communities
+    ]
 
 @router.get("/{community_id}", response_model=CommunityResponse)
 async def read_community(
@@ -86,7 +88,7 @@ async def read_community(
             detail="无权访问该社区信息"
         )
     
-    return community_obj
+    return CommunityResponse.model_validate(community_obj).model_dump()
 
 @router.put("/{community_id}", response_model=CommunityResponse)
 async def update_community(
@@ -113,8 +115,23 @@ async def update_community(
             detail="无权修改该社区信息"
         )
     
-    community_obj = community.update(db, db_obj=community_obj, obj_in=community_in)
-    return community_obj
+    # Permission check: Only superuser or primary manager of the property company can update
+    can_update = False
+    if current_user.is_superuser:
+        can_update = True
+    else:
+        if community_obj.property_company_id:
+            primary_manager = community.get_primary_manager_for_company(
+                db, property_company_id=community_obj.property_company_id
+            )
+            if primary_manager and primary_manager.manager_id == current_user.id:
+                can_update = True
+
+    if not can_update:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this community")
+
+    updated_community = community.update(db, db_obj=community_obj, obj_in=community_in)
+    return CommunityResponse.model_validate(updated_community).model_dump()
 
 @router.delete("/{community_id}", response_model=CommunityResponse)
 async def delete_community(

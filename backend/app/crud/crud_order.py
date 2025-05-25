@@ -6,10 +6,10 @@ import uuid
 
 from app.crud.base import CRUDBase
 from app.models.order import Order, OrderStatus
-from app.models.property import Property
 from app.models.property_manager import PropertyManager
 from app.models.address import Address
 from app.models.community import Community
+from app.models.transport_manager import TransportManager
 from app.schemas.order import OrderCreate, OrderUpdate
 
 class CRUDOrder(CRUDBase[Order, OrderCreate, OrderUpdate]):
@@ -39,10 +39,10 @@ class CRUDOrder(CRUDBase[Order, OrderCreate, OrderUpdate]):
         for pm_record in property_manager_records:
             if pm_record.is_primary:
                 # 主要管理员：获取其物业公司管理的所有小区ID
-                if pm_record.property_id:
+                if pm_record.property_company_id:
                     # property_obj = db.query(Property).filter(Property.id == pm_record.property_id).options(joinedload(Property.communities)).first()
                     # Query communities directly associated with the property
-                    communities_of_property = db.query(Community.id).filter(Community.property_id == pm_record.property_id).all()
+                    communities_of_property = db.query(Community.id).filter(Community.property_company_id == pm_record.property_company_id).all()
                     for comm_id_tuple in communities_of_property:
                         accessible_community_ids.add(comm_id_tuple[0])
             else:
@@ -88,13 +88,35 @@ class CRUDOrder(CRUDBase[Order, OrderCreate, OrderUpdate]):
             query = query.filter(Order.status == status)
         return query.options(joinedload(Order.address).joinedload(Address.community)).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
     
-    def get_by_driver(self, db: Session, *, driver_id: int, skip: int = 0, limit: int = 100) -> List[Order]:
-        """获取司机负责的所有订单"""
-        return db.query(Order).filter(Order.driver_id == driver_id).options(joinedload(Order.address).joinedload(Address.community)).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
+    def get_by_driver(self, db: Session, *, driver_manager_assoc_id: int, skip: int = 0, limit: int = 100, status: Optional[str] = None) -> List[Order]:
+        """获取司机负责的所有订单 (通过 TransportManager.id)"""
+        # Order.driver_id has been replaced by Order.driver_assoc_id which links to TransportManager.id
+        query = db.query(Order).filter(Order.driver_assoc_id == driver_manager_assoc_id)
+        if status:
+            query = query.filter(Order.status == status)
+        return query.options(
+            joinedload(Order.address).joinedload(Address.community),
+            joinedload(Order.transport_company),
+            joinedload(Order.vehicle)
+        ).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
     
-    def get_by_recycling_station(self, db: Session, *, recycling_station_id: int, skip: int = 0, limit: int = 100) -> List[Order]:
-        """获取回收站的所有订单"""
-        return db.query(Order).filter(Order.recycling_station_id == recycling_station_id).options(joinedload(Order.address).joinedload(Address.community)).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
+    def get_by_transport_company(self, db: Session, *, transport_company_id: int, skip: int = 0, limit: int = 100, status: Optional[str] = None) -> List[Order]:
+        """获取指定运输公司处理的所有订单"""
+        query = db.query(Order).filter(Order.transport_company_id == transport_company_id)
+        if status:
+            query = query.filter(Order.status == status)
+        return query.options(
+            joinedload(Order.address).joinedload(Address.community),
+            joinedload(Order.driver_association).joinedload(TransportManager.manager), # Load driver's user details
+            joinedload(Order.vehicle)
+        ).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
+
+    def get_by_recycling_company(self, db: Session, *, recycling_company_id: int, skip: int = 0, limit: int = 100, status: Optional[str] = None) -> List[Order]:
+        """获取回收公司的所有订单"""
+        query = db.query(Order).filter(Order.recycling_company_id == recycling_company_id)
+        if status:
+            query = query.filter(Order.status == status)
+        return query.options(joinedload(Order.address).joinedload(Address.community)).order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
     
     def get_by_status(self, db: Session, *, status: str, skip: int = 0, limit: int = 100) -> List[Order]:
         """根据状态获取订单"""

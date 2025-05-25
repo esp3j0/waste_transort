@@ -21,6 +21,7 @@ class PropertyManagerBase(BaseModel):
 class PropertyManagerCreate(PropertyManagerBase):
     """创建物业管理员模型"""
     manager_id: int = Field(..., description="管理员用户ID")
+    property_company_id: int = Field(..., description="所属物业公司ID")
 
 
 # 更新物业管理员
@@ -51,7 +52,7 @@ class PropertyManagerUpdate(BaseModel):
 class PropertyManagerResponse(PropertyManagerBase):
     """物业管理员响应模型"""
     id: int = Field(..., description="关联ID")
-    property_id: int = Field(..., description="所属物业ID")
+    property_company_id: int = Field(..., description="所属物业公司ID")
     manager_id: int = Field(..., description="管理员用户ID")
     community: Optional[CommunityResponse] = Field(None, description="关联的小区信息")
     created_at: datetime = Field(..., description="创建时间")
