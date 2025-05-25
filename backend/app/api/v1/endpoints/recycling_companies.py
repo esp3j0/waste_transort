@@ -6,6 +6,7 @@ from app.api.deps import get_current_active_user
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.models.recycling_company import RecyclingCompanyType, RecyclingCompany, RecyclingCompanyStatus # Import Status enum
+from app.models.recycling_manager import RecyclingRole
 from app.schemas.recycling_company import (
     RecyclingCompanyCreate, 
     RecyclingCompanyUpdate, 
