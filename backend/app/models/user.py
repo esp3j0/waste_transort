@@ -43,6 +43,12 @@ class User(Base):
     # 物业管理员关系
     managed_properties = relationship("PropertyManager", back_populates="manager")
     
+    # 运输管理员关系
+    managed_transport_companies = relationship("TransportManager", back_populates="manager")
+    
+    # 回收管理员关系 (新添加)
+    managed_recycling_companies = relationship("RecyclingManager", back_populates="manager")
+    
     @property
     def primary_property(self):
         """获取用户作为主要管理员的物业公司"""

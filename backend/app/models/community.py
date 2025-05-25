@@ -16,8 +16,10 @@ class Community(Base):
     is_active = Column(Boolean, default=True)  # 是否激活
     
     # 关联物业公司
-    property_id = Column(Integer, ForeignKey("property.id"), nullable=False)
-    property = relationship("Property", back_populates="communities")
+    # property_id = Column(Integer, ForeignKey("property.id"), nullable=False) # 旧外键
+    property_company_id = Column(Integer, ForeignKey("property_company.id"), nullable=False) # 新外键
+    # property = relationship("Property", back_populates="communities") # 旧关系
+    property_company = relationship("PropertyCompany", back_populates="communities") # 新关系
     
     # 时间戳
     created_at = Column(DateTime, default=datetime.utcnow)  # 创建时间

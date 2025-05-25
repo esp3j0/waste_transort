@@ -1,5 +1,4 @@
-from typing import Any, Dict, Optional, Union
-
+from typing import Any, Dict, Optional, Union, List
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
@@ -8,10 +7,10 @@ from app.models.property_manager import PropertyManager
 from app.schemas.property_manager import PropertyManagerCreate, PropertyManagerUpdate
 
 class CRUDPropertyManager(CRUDBase[PropertyManager, PropertyManagerCreate, PropertyManagerUpdate]):
-    def create(self, db: Session, *, obj_in: PropertyManagerCreate, property_id: int) -> PropertyManager:
+    def create(self, db: Session, *, obj_in: PropertyManagerCreate) -> PropertyManager:
         """
-        创建新的物业管理员关联记录
-        - property_id: 物业公司的ID，将从路径参数或依赖项中获取
+        创建新的物业管理员关联记录.
+        property_company_id is now part of PropertyManagerCreate schema.
         """
         if obj_in.is_primary is False and obj_in.community_id is None:
             raise HTTPException(
@@ -19,23 +18,26 @@ class CRUDPropertyManager(CRUDBase[PropertyManager, PropertyManagerCreate, Prope
                 detail="非主要管理员必须关联一个小区 (community_id is required for non-primary managers)."
             )
         if obj_in.is_primary is True and obj_in.community_id is not None:
-            # 根据需求，如果主要管理员不应关联小区，则取消下面的注释或将community_id设为None
-            # raise HTTPException(
-            #     status_code=400,
-            #     detail="主要管理员不能关联特定小区，community_id 必须为 null."
-            # )
-            # 或者自动设置 community_id 为 None
             obj_in.community_id = None
 
-
-        db_obj = PropertyManager(
-            **obj_in.model_dump(),
-            property_id=property_id
+        existing = self.get_by_property_company_and_manager_user(
+            db, property_company_id=obj_in.property_company_id, manager_user_id=obj_in.manager_id
         )
-        db.add(db_obj)
-        db.commit()
-        db.refresh(db_obj)
-        return db_obj
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"User {obj_in.manager_id} is already a manager for property company {obj_in.property_company_id}."
+            )
+
+        if obj_in.is_primary:
+            primary_manager = self.get_primary_manager_for_company(db, property_company_id=obj_in.property_company_id)
+            if primary_manager:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Property company {obj_in.property_company_id} already has a primary manager (User ID: {primary_manager.manager_id})."
+                )
+
+        return super().create(db=db, obj_in=obj_in)
 
     def update(
         self, db: Session, *, db_obj: PropertyManager, obj_in: Union[PropertyManagerUpdate, Dict[str, Any]]
@@ -48,40 +50,57 @@ class CRUDPropertyManager(CRUDBase[PropertyManager, PropertyManagerCreate, Prope
         else:
             update_data = obj_in.model_dump(exclude_unset=True)
 
-        # 确定最终的 is_primary 状态
-        # 如果 is_primary 在 update_data 中，则使用新值；否则，使用 db_obj 中的旧值。
         is_primary_final = update_data.get("is_primary", db_obj.is_primary)
-        
-        # 确定最终的 community_id
-        # 如果 community_id 在 update_data 中，则使用新值；否则，使用 db_obj 中的旧值。
         community_id_final = update_data.get("community_id", db_obj.community_id)
 
         if is_primary_final is False and community_id_final is None:
-            raise HTTPException(
-                status_code=400,
-                detail="非主要管理员必须关联一个小区 (community_id cannot be null for non-primary managers when updating)."
-            )
+            if not update_data.get("role"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="非主要管理员必须关联一个小区。"
+                )
 
         if is_primary_final is True:
-            # 如果更新后成为主要管理员，则其 community_id 应设为 None
-            # 确保将 None 显式写入 update_data，以便 super().update 会应用它
             update_data["community_id"] = None
         
-        # 调用父类的 update 方法前，确保 obj_in 是符合预期的类型
-        # 如果原始 obj_in 是 PropertyManagerUpdate schema，并且我们修改了 update_data 字典，
-        # 父类 update 可能期望的是字典或 schema 对象。
-        # CRUDBase 通常处理字典形式的 update_data。
+        if is_primary_final is True and not db_obj.is_primary:
+            other_primary_manager = self.get_primary_manager_for_company(
+                db, property_company_id=db_obj.property_company_id, exclude_self_id=db_obj.id
+            )
+            if other_primary_manager:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Property company {db_obj.property_company_id} already has another primary manager (User ID: {other_primary_manager.manager_id}). Cannot set this manager as primary."
+                )
+
         return super().update(db, db_obj=db_obj, obj_in=update_data)
 
-    def get_by_property_and_manager(
-        self, db: Session, *, property_id: int, manager_id: int
+    def get_by_property_company_and_manager_user(
+        self, db: Session, *, property_company_id: int, manager_user_id: int
     ) -> Optional[PropertyManager]:
         return db.query(PropertyManager).filter(
-            PropertyManager.property_id == property_id,
-            PropertyManager.manager_id == manager_id
+            PropertyManager.property_company_id == property_company_id,
+            PropertyManager.manager_id == manager_user_id
         ).first()
 
-    # 可以根据需要添加更多 specific 的查询方法
-    # 例如：get_all_by_property_id, get_all_by_community_id 等
+    def get_managers_by_company(
+        self, db: Session, *, property_company_id: int, skip: int = 0, limit: int = 100
+    ) -> List[PropertyManager]:
+        """获取某个物业公司的所有管理人员"""
+        return db.query(PropertyManager).filter(
+            PropertyManager.property_company_id == property_company_id
+        ).offset(skip).limit(limit).all()
+
+    def get_primary_manager_for_company(
+        self, db: Session, *, property_company_id: int, exclude_self_id: Optional[int] = None
+    ) -> Optional[PropertyManager]:
+        """获取物业公司的主要管理员，可选排除某个ID (用于更新检查)"""
+        query = db.query(PropertyManager).filter(
+            PropertyManager.property_company_id == property_company_id,
+            PropertyManager.is_primary == True
+        )
+        if exclude_self_id:
+            query = query.filter(PropertyManager.id != exclude_self_id)
+        return query.first()
 
 property_manager = CRUDPropertyManager(PropertyManager) 

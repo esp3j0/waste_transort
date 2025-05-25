@@ -58,20 +58,29 @@ class Order(Base):
     property_confirm_time = Column(DateTime, nullable=True)  # 物业确认时间
     property_notes = Column(Text, nullable=True)  # 物业备注
     
-    # 运输管理信息
-    transport_manager_id = Column(Integer, ForeignKey("user.id"), nullable=True)
+    # 运输管理信息 (Updated)
+    transport_company_id = Column(Integer, ForeignKey("transport_company.id"), nullable=True) # 新增：关联运输公司
+    transport_company = relationship("TransportCompany", back_populates="orders") # 新增：关联运输公司
+    
+    transport_manager_id = Column(Integer, ForeignKey("user.id"), nullable=True) # 调度员的用户ID (User.id of TransportManager with role DISPATCHER)
     transport_manager = relationship("User", back_populates="transport_orders", foreign_keys=[transport_manager_id])
-    driver_id = Column(Integer, ForeignKey("transport.id"), nullable=True)  # 司机ID
-    driver = relationship("Transport", back_populates="orders")  # 司机信息
-    vehicle_plate = Column(String, nullable=True)  # 车牌号
+    
+    # driver_id = Column(Integer, ForeignKey("transport.id"), nullable=True)  # 旧的司机ID (指向旧 transport 表)
+    # driver = relationship("Transport", back_populates="orders")  # 旧的司机信息
+    driver_assoc_id = Column(Integer, ForeignKey("transport_manager.id"), nullable=True) # 新：指向 transport_manager 表中司机记录的ID
+    driver_association = relationship("TransportManager", foreign_keys=[driver_assoc_id]) # 新：司机管理记录 (包含用户ID和司机状态)
+
+    # vehicle_plate = Column(String, nullable=True)  # 车牌号 (可以保留，但最好通过 vehicle_id 关联)
+    vehicle_id = Column(Integer, ForeignKey("vehicle.id"), nullable=True) # 新增：关联车辆
+    vehicle = relationship("Vehicle") # 新增：关联车辆信息 (Vehicle.orders 需要反向关系如果双向)
+    
     transport_route = Column(String, nullable=True)  # 运输路线
-    transport_notes = Column(Text, nullable=True)  # 运输备注
     
     # 处置回收信息
     recycling_manager_id = Column(Integer, ForeignKey("user.id"), nullable=True)
     recycling_manager = relationship("User", back_populates="recycling_orders", foreign_keys=[recycling_manager_id])
-    recycling_station_id = Column(Integer, ForeignKey("recycling.id"), nullable=True)  # 回收站ID
-    recycling_station = relationship("Recycling", back_populates="orders")  # 回收站信息
+    recycling_company_id = Column(Integer, ForeignKey("recycling_company.id"), nullable=True) # 新: 回收公司ID
+    recycling_company = relationship("RecyclingCompany", back_populates="orders") # 新: 回收公司信息
     recycling_confirm_time = Column(DateTime, nullable=True)  # 回收确认时间
     recycling_notes = Column(Text, nullable=True)  # 回收备注
     
@@ -84,6 +93,12 @@ class Order(Base):
     price = Column(Float, default=0.0)  # 订单价格
     payment_status = Column(String, default="unpaid")  # 支付状态
     payment_time = Column(DateTime, nullable=True)  # 支付时间
+
+    # 新增: 关联废物记录
+    waste_records = relationship("WasteRecord", back_populates="order", cascade="all, delete-orphan")
+
+    # 新增: 关联支付记录
+    payments = relationship("Payment", back_populates="order", cascade="all, delete-orphan")
 
 class Renovation(Base):
     """装修报备模型"""
@@ -114,8 +129,11 @@ class Renovation(Base):
     materials = Column(Text, nullable=True)  # 主要材料清单
     
     # 物业信息
-    property_id = Column(Integer, ForeignKey("property.id"))  # 物业ID
-    property = relationship("Property", foreign_keys=[property_id])  # 物业信息
+    # property_id = Column(Integer, ForeignKey("property.id"))  # 旧物业ID
+    property_company_id = Column(Integer, ForeignKey("property_company.id"))  # 新物业公司ID
+    # property = relationship("Property", foreign_keys=[property_id])  # 旧物业信息
+    property_company = relationship("PropertyCompany", foreign_keys=[property_company_id]) # 新物业公司信息
+    
     property_manager_id = Column(Integer, ForeignKey("user.id"), nullable=True)  # 物业审核人ID
     property_manager = relationship("User", foreign_keys=[property_manager_id])  # 物业审核人
     
@@ -131,3 +149,14 @@ class Renovation(Base):
     # 其他信息
     notes = Column(Text, nullable=True)  # 备注
     attachments = Column(Text, nullable=True)  # 附件（可以存储文件路径或URL）
+
+    # Make sure TransportCompany model has `orders = relationship("Order", back_populates="transport_company")`
+    # Make sure Vehicle model has `orders = relationship("Order", back_populates="vehicle")` if bidirectional needed
+
+    # The driver_association relationship points to a TransportManager record.
+    # To get the actual User object for the driver:
+    # order.driver_association.manager (User object)
+    # To get driver's status:
+    # order.driver_association.driver_status
+
+    # The transport_manager relationship already points to a User object (the dispatcher).

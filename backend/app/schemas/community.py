@@ -13,7 +13,7 @@ class CommunityBase(BaseModel):
 # 创建模型
 class CommunityCreate(CommunityBase):
     """创建社区模型"""
-    pass
+    property_company_id: int
 
 # 更新模型
 class CommunityUpdate(BaseModel):
@@ -27,7 +27,7 @@ class CommunityUpdate(BaseModel):
 class CommunityResponse(CommunityBase):
     """社区响应模型"""
     id: int = Field(..., description="社区ID")
-    property_id: int = Field(..., description="所属物业ID")
+    property_company_id: int = Field(..., description="所属物业公司ID")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
