@@ -6,8 +6,9 @@ from app.api.deps import get_current_active_user
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.models.transport_company import TransportCompany
+from app.models.transport_manager import TransportRole
 from app.models.vehicle import Vehicle, VehicleStatus
-from app.schemas.vehicle import VehicleCreate, VehicleUpdate, VehicleResponse
+from app.schemas.vehicle import VehicleCreate, VehicleUpdate, VehicleResponse, VehicleStatusUpdate
 from app.crud import crud_vehicle, crud_transport_company, crud_transport_manager
 
 router = APIRouter()
@@ -26,7 +27,7 @@ async def create_vehicle_for_company(
     if not company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Transport company {vehicle_in.transport_company_id} not found.")
 
-    # Permissions: Superuser or primary manager of the company can add vehicles
+    # Permissions: Superuser or primary manager/dispatcher of the company can add vehicles
     can_add_vehicle = False
     if current_user.is_superuser:
         can_add_vehicle = True
@@ -34,7 +35,7 @@ async def create_vehicle_for_company(
         manager_assoc = crud_transport_manager.transport_manager.get_by_company_and_manager_user(
             db, transport_company_id=vehicle_in.transport_company_id, manager_user_id=current_user.id
         )
-        if manager_assoc and manager_assoc.is_primary:
+        if manager_assoc and (manager_assoc.is_primary or manager_assoc.role == TransportRole.DISPATCHER):
             can_add_vehicle = True
             
     if not can_add_vehicle:
@@ -44,9 +45,8 @@ async def create_vehicle_for_company(
     if existing_vehicle:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Vehicle with plate number {vehicle_in.plate_number} already exists.")
     
-    # The transport_company_id is part of VehicleCreate schema
-    new_vehicle = crud_vehicle.vehicle.create(db, obj_in=vehicle_in)
-    return new_vehicle
+    new_vehicle_db = crud_vehicle.vehicle.create(db, obj_in=vehicle_in)
+    return VehicleResponse.model_validate(new_vehicle_db).model_dump()
 
 @router.get("/company/{company_id}", response_model=List[VehicleResponse])
 async def list_vehicles_for_company(
@@ -76,10 +76,10 @@ async def list_vehicles_for_company(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view vehicles for this company.")
 
     if status_filter:
-        vehicles = crud_vehicle.vehicle.get_vehicles_by_status(db, transport_company_id=company_id, status=status_filter)
+        vehicles_db = crud_vehicle.vehicle.get_vehicles_by_status(db, transport_company_id=company_id, status=status_filter)
     else:
-        vehicles = crud_vehicle.vehicle.get_by_transport_company(db, transport_company_id=company_id)
-    return vehicles
+        vehicles_db = crud_vehicle.vehicle.get_by_transport_company(db, transport_company_id=company_id)
+    return [VehicleResponse.model_validate(v).model_dump() for v in vehicles_db]
 
 @router.get("/{vehicle_id}", response_model=VehicleResponse)
 async def get_vehicle_details(
@@ -106,7 +106,7 @@ async def get_vehicle_details(
     
     if not can_view_vehicle:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view this vehicle.")
-    return db_vehicle
+    return VehicleResponse.model_validate(db_vehicle).model_dump()
 
 @router.put("/{vehicle_id}", response_model=VehicleResponse)
 async def update_vehicle_details(
@@ -121,7 +121,7 @@ async def update_vehicle_details(
     if not db_vehicle:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found.")
 
-    # Permissions: Superuser or primary manager of the vehicle's company
+    # Permissions: Superuser or primary manager/dispatcher of the vehicle's company
     can_update_vehicle = False
     if current_user.is_superuser:
         can_update_vehicle = True
@@ -129,20 +129,51 @@ async def update_vehicle_details(
         manager_assoc = crud_transport_manager.transport_manager.get_by_company_and_manager_user(
             db, transport_company_id=db_vehicle.transport_company_id, manager_user_id=current_user.id
         )
-        if manager_assoc and manager_assoc.is_primary:
+        if manager_assoc and (manager_assoc.is_primary or manager_assoc.role == TransportRole.DISPATCHER):
             can_update_vehicle = True
             
     if not can_update_vehicle:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this vehicle.")
     
-    # If plate_number is being changed, check for uniqueness again
     if vehicle_in.plate_number and vehicle_in.plate_number != db_vehicle.plate_number:
         existing_vehicle = crud_vehicle.vehicle.get_by_plate_number(db, plate_number=vehicle_in.plate_number)
         if existing_vehicle and existing_vehicle.id != vehicle_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Another vehicle with plate number {vehicle_in.plate_number} already exists.")
 
-    updated_vehicle = crud_vehicle.vehicle.update(db, db_obj=db_vehicle, obj_in=vehicle_in)
-    return updated_vehicle
+    updated_vehicle_db = crud_vehicle.vehicle.update(db, db_obj=db_vehicle, obj_in=vehicle_in)
+    return VehicleResponse.model_validate(updated_vehicle_db).model_dump()
+
+@router.put("/{vehicle_id}/status", response_model=VehicleResponse)
+async def update_vehicle_status(
+    *,
+    db: Session = Depends(get_db),
+    vehicle_id: int,
+    status_in: VehicleStatusUpdate, # New schema for just status
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """更新车辆状态。"""
+    db_vehicle = crud_vehicle.vehicle.get(db, id=vehicle_id)
+    if not db_vehicle:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found.")
+
+    # Permissions: Superuser or primary manager/dispatcher of the vehicle's company
+    can_update_status = False
+    if current_user.is_superuser:
+        can_update_status = True
+    else:
+        manager_assoc = crud_transport_manager.transport_manager.get_by_company_and_manager_user(
+            db, transport_company_id=db_vehicle.transport_company_id, manager_user_id=current_user.id
+        )
+        if manager_assoc and (manager_assoc.is_primary or manager_assoc.role == TransportRole.DISPATCHER):
+            can_update_status = True
+            
+    if not can_update_status:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this vehicle's status.")
+
+    # The CRUD update method can take a Pydantic schema or a dict.
+    # Here, status_in is VehicleStatusUpdate schema.
+    updated_vehicle_db = crud_vehicle.vehicle.update(db, db_obj=db_vehicle, obj_in=status_in)
+    return VehicleResponse.model_validate(updated_vehicle_db).model_dump()
 
 @router.delete("/{vehicle_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_vehicle(
@@ -156,7 +187,7 @@ async def delete_vehicle(
     if not db_vehicle:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found.")
 
-    # Permissions: Superuser or primary manager of the vehicle's company
+    # Permissions: Superuser or primary manager/dispatcher of the vehicle's company
     can_delete_vehicle = False
     if current_user.is_superuser:
         can_delete_vehicle = True
@@ -164,12 +195,20 @@ async def delete_vehicle(
         manager_assoc = crud_transport_manager.transport_manager.get_by_company_and_manager_user(
             db, transport_company_id=db_vehicle.transport_company_id, manager_user_id=current_user.id
         )
-        if manager_assoc and manager_assoc.is_primary:
+        # Stricter: only primary manager for deletion
+        if manager_assoc and manager_assoc.is_primary: 
             can_delete_vehicle = True
             
     if not can_delete_vehicle:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this vehicle.")
     
     # Consider if vehicle is in use by an order. Prevent deletion or handle gracefully.
+    # This check should ideally be in the CRUD layer or a service layer if business logic becomes complex.
+    # For now, direct removal.
+    # Example: check if vehicle is assigned to any non-completed/non-cancelled orders
+    # active_orders_with_vehicle = db.query(Order).filter(Order.vehicle_id == vehicle_id, Order.status.notin_([OrderStatus.COMPLETED, OrderStatus.CANCELLED])).count()
+    # if active_orders_with_vehicle > 0:
+    #     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete vehicle. It is currently assigned to active orders.")
+
     crud_vehicle.vehicle.remove(db, id=vehicle_id)
     return 

@@ -37,6 +37,20 @@ class VehicleUpdate(BaseModel):
     is_active: Optional[bool] = Field(None, description="是否激活")
     # transport_company_id: Optional[int] = Field(None, description="所属运输公司ID (一般不建议修改)")
 
+# 车辆状态更新模型
+class VehicleStatusUpdate(BaseModel):
+    """车辆状态更新模型"""
+    status: VehicleStatus = Field(..., description="车辆目标状态")
+
+    @validator('status')
+    def validate_status_enum(cls, v):
+        if not isinstance(v, VehicleStatus):
+            try:
+                return VehicleStatus(v) #尝试从字符串转换
+            except ValueError:
+                raise ValueError(f'无效的车辆状态: {v}. 必须是 {VehicleStatus.__members__.keys()} 之一')
+        return v
+
 # 车辆响应模型
 class VehicleResponse(VehicleBase):
     """车辆响应模型"""
