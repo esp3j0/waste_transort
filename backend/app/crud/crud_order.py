@@ -6,7 +6,6 @@ import uuid
 
 from app.crud.base import CRUDBase
 from app.models.order import Order, OrderStatus
-from app.models.property import Property
 from app.models.property_manager import PropertyManager
 from app.models.address import Address
 from app.models.community import Community

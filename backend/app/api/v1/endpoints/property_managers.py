@@ -84,8 +84,8 @@ async def list_managers_for_property_company(
     #     personnel = crud_property_manager.property_manager.get_by_company_and_role(db, property_company_id=company_id, role=role_filter)
     # else:
     personnel = crud_property_manager.property_manager.get_managers_by_company(db, property_company_id=company_id)
-    if role_filter:
-        personnel = [p for p in personnel if p.role == role_filter]
+    # if role_filter:
+    #     personnel = [p for p in personnel if p.role == role_filter]
     return [PropertyManagerResponse.model_validate(p).model_dump() for p in personnel]
 
 @router.get("/{manager_assoc_id}", response_model=PropertyManagerResponse)
